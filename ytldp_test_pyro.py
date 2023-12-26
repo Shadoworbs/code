@@ -44,18 +44,24 @@ from replies import help_text, dl_text, upl_text, about_text, err_dl_vid_text, e
 # creating command handler for /start
 @bot.on_message(filters.command('start'))
 async def start_command(bot, message):
+    await bot.send_chat_action(message.chat.id, enums.ChatAction.TYPING)
+    time.sleep(3)
     await message.reply(f'Hello {message.from_user.mention} 👀\n{start_text}')
     
 
 # creating command handler for /help
 @bot.on_message(filters.command('help'))
 async def help_command(bot, message):
+    await bot.send_chat_action(message.chat.id, enums.ChatAction.TYPING)
+    time.sleep(3)
     await message.reply(help_text)
 
 
 # creating command handler for /about
 @bot.on_message(filters.command('about'))
 async def about_command(bot, message):
+    await bot.send_chat_action(message.chat.id, enums.ChatAction.TYPING)
+    time.sleep(3)
     await message.reply(about_text)
 
 # chat_id = "-1002093827040"
@@ -104,11 +110,11 @@ async def download_video(bot, message): # main function to download the video
             height = info[4]
             title_original = info[-1]
             trimmed_title = info[-1][0:10]
-            print(f"Title: {trimmed_title} Extension: {extension}") 
+            # print(f"Title: {trimmed_title} Extension: {extension}") 
             for file in os.listdir(cwd):
                 if file.startswith(trimmed_title) and file.endswith(extension):
                     title_final = os.path.join(cwd, file)
-                    print(title_final)
+                    # print(title_final)
             
         except:
             print('\nVideo download error!')
@@ -120,6 +126,7 @@ async def download_video(bot, message): # main function to download the video
 
         ################### Uploading the video ####################
         uploading = await downloading.edit(upl_text) # send message status of the video to the user
+        
 
         print('\nStatus: Sending video...') # print status to the console
 
@@ -128,9 +135,9 @@ async def download_video(bot, message): # main function to download the video
             
         try: # using try statement so that code continues when there is an error
 
-           
+            await bot.send_chat_action(message.chat.id, enums.ChatAction.UPLOAD_VIDEO)
             await bot.send_video(message.chat.id, title_final, caption=f"<code>{title_original}.{extension}</code>", progress=progress, file_name=f"{title_original}.{extension}") # send that video
-                
+            await bot.send_chat_action(message.chat.id, enums.ChatAction.CANCEL)
             print(liness) # print a horizontal line
                 # display_log # print username and id of users who contact the bot (console)
 
