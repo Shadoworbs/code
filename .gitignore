@@ -1,0 +1,12 @@
+/.venv
+/.vscode
+/bot_account.session
+/bot_account.session-journal
+/config.py
+/replies.py
+/temp.py
+/*.jpg
+/*.png
+/videos
+/yl.log
+/__pycache__
