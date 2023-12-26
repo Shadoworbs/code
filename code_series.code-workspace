@@ -5,8 +5,5 @@
 		}
 	],
 	"settings": {
-		"makefile.alwaysPreConfigure": true,
-		"makefile.alwaysPostConfigure": true,
-		"makefile.makefilePath": "C:\\Users\\SHADOWORBS\\Downloads\\Telegram Desktop\\Creating-a-telegram-bot-series\\code\\python-pixabay\\Makefile"
 	}
 }
