@@ -1,8 +1,9 @@
 
 from pyrogram import Client, emoji, filters
+import config as cfg
 
 # Target chat. Can also be a list of multiple chat ids/usernames
-TARGET = -1002093827040
+TARGET = cfg.target_chat_id
 # Welcome message template
 MESSAGE = "{} Welcome to [Pyrogram](https://docs.pyrogram.org/)'s group chat {}!"
 

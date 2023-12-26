@@ -12,6 +12,8 @@ from genericpath import isfile
 import shutil
 import config as cfg
 from pyrogram.types import (ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton)
+from pyrogram import enums
+
 
 api_id = cfg.api_id
 api_hash = cfg.api_hash
@@ -146,7 +148,7 @@ async def download_video(bot, message): # main function to download the video
             return # stop the program
         
 
-        
+
 ################ setting up the link logs ########################
         try:
             await bot.send_message(link_logs, f"""

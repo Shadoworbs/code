@@ -3,9 +3,10 @@ from pyrogram import Client, filters, emoji
 from datetime import datetime, timedelta
 from replies import *
 from pyrogram import enums
+import config as cfg
 
-api_id = 11518683
-api_hash = "100b7f1911bdb7d71a0bcde24e3408e6"
+api_id = cfg.api_id
+api_hash = cfg.api_hash
 # bot_token = "6740634486:AAHNYCfCcpSdZk6-kBOX6lhGxrV7F_HCbwM"
 # bot = client('bot_account'
 
