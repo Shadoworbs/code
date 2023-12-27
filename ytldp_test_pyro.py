@@ -45,7 +45,7 @@ from replies import help_text, dl_text, upl_text, about_text, err_dl_vid_text, e
 @bot.on_message(filters.command('start'))
 async def start_command(bot, message):
     await bot.send_chat_action(message.chat.id, enums.ChatAction.TYPING)
-    time.sleep(3)
+    time.sleep(1)
     await message.reply(f'Hello {message.from_user.mention} 👀\n{start_text}')
     
 
@@ -53,7 +53,7 @@ async def start_command(bot, message):
 @bot.on_message(filters.command('help'))
 async def help_command(bot, message):
     await bot.send_chat_action(message.chat.id, enums.ChatAction.TYPING)
-    time.sleep(3)
+    time.sleep(1)
     await message.reply(help_text)
 
 
@@ -61,13 +61,15 @@ async def help_command(bot, message):
 @bot.on_message(filters.command('about'))
 async def about_command(bot, message):
     await bot.send_chat_action(message.chat.id, enums.ChatAction.TYPING)
-    time.sleep(3)
+    time.sleep(1)
     await message.reply(about_text)
 
 # chat_id = "-1002093827040"
 @bot.on_message(filters.text) #check if the message is a text message
 async def download_video(bot, message): # main function to download the video
     info = []
+    
+
     # creating a variable that will print username and id of users who contact the bot (console)
     display_log = print(f"\nName: {message.from_user.first_name}\nID: {message.from_user.id}\nMessage: {message.text}\n{liness}" )
     
@@ -80,41 +82,41 @@ async def download_video(bot, message): # main function to download the video
         try:
             ############### creating a list to store values from the function below ################
             
-            async def download_vid(url):
-                height: str = 360
-                fps: str = 30
-                # 'outtmpl':'video','windowsfilenames': '',
-                opts = {"format": f"((bv*[fps>={fps}]/bv*)[height<={height}]/(wv*[fps>={fps}]/wv*)) + ba / (b[fps>{fps}]/b)[height<={height}]/(w[fps>={fps}]/w)"}
-                with yt_dlp.YoutubeDL(opts) as ydl:
-                    info_dict = ydl.extract_info(url=message.text, download=True)
-                    title: str = info_dict.get('title', str)
-                    title_original: str = info_dict.get('title', str)
-                    extension: str = info_dict.get('ext', str)
-                    dur: str = info_dict.get('duration_string', str)
-                    res: str = info_dict.get('resolution', str)
-                    upload = info_dict.get('upload_date')
-                    id = info_dict.get('id')
-                    for i in str(title):
-                        title = title.replace(" ", '_')
-                    info.append(title)
-                    info.append(extension)
-                    info.append(dur)
-                    info.append(res)
-                    info.append(height)
-                    info.append(title_original)
-            await download_vid(url=message.text)
-            title = info[0]
-            extension = info[1]
-            dur = info[2]
-            res = info[3]
-            height = info[4]
-            title_original = info[-1]
-            trimmed_title = info[-1][0:10]
-            # print(f"Title: {trimmed_title} Extension: {extension}") 
+            # async def download_vid(url):
+            height: str = 360
+            fps: str = 30
+            # 'outtmpl':'video','windowsfilenames': '',
+            opts = {"format": f"((bv*[fps>={fps}]/bv*)[height<={height}]/(wv*[fps>={fps}]/wv*)) + ba / (b[fps>{fps}]/b)[height<={height}]/(w[fps>={fps}]/w)"}
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                info_dict = ydl.extract_info(url = message.text, download=True)
+                title_original: str = info_dict.get('title', str)
+                extension: str = info_dict.get('ext', str)
+                dur: str = info_dict.get('duration_string', str)
+                res: str = info_dict.get('resolution', str)
+
+                upload_date = info_dict.get('upload_date')
+                id = info_dict.get('id')
+                info.append(extension)
+                info.append(dur)
+                info.append(res)
+                info.append(height)
+                info.append(upload_date)
+                info.append(id)
+                info.append(title_original)
+            # download_vid(url = message.text)
+            extension = info[0]
+            dur = info[1]
+            res = info[2]
+            height = info[3]
+            upload_date = info[4]
+            id = info[5]
+            title_original = info[6]
+            # time.sleep(5)
             for file in os.listdir(cwd):
-                if file.startswith(trimmed_title) and file.endswith(extension):
-                    title_final = os.path.join(cwd, file)
-                    # print(title_final)
+                if file.startswith(title_original[:5]) and file.endswith(extension):
+                    info.append(os.path.join(cwd, file))
+                    video_path: str = info[-1]
+
             
         except:
             print('\nVideo download error!')
@@ -125,6 +127,7 @@ async def download_video(bot, message): # main function to download the video
 
 
         ################### Uploading the video ####################
+
         uploading = await downloading.edit(upl_text) # send message status of the video to the user
         
 
@@ -132,12 +135,20 @@ async def download_video(bot, message): # main function to download the video
 
         async def progress(current, total): # defining a function to show us the progress of the upload
             print(f"{current * 100 / total:.1f}%")
-            
+        # extension:str = info[0]
+        # dur:str = info[1]
+        # res:str = info[2]
+        # height:str = info[3]
+        # title_original:str = info[-2]
+        # video_path:str = info[-1]    
         try: # using try statement so that code continues when there is an error
 
             await bot.send_chat_action(message.chat.id, enums.ChatAction.UPLOAD_VIDEO)
-            await bot.send_video(message.chat.id, title_final, caption=f"<code>{title_original}.{extension}</code>", progress=progress, file_name=f"{title_original}.{extension}") # send that video
-            await bot.send_chat_action(message.chat.id, enums.ChatAction.CANCEL)
+            await bot.send_video(message.chat.id,
+                                 video_path,
+                                 caption=f"<code>{title_original}.{extension}</code>",
+                                 progress=progress,
+                                 file_name=f"{title_original}.{extension}") # send that video
             print(liness) # print a horizontal line
                 # display_log # print username and id of users who contact the bot (console)
 
@@ -158,19 +169,22 @@ async def download_video(bot, message): # main function to download the video
 
 ################ setting up the link logs ########################
         try:
+            
             await bot.send_message(link_logs, f"""
-<b>Filename:</b> 
+<b>Filename:</b>
 <code>{title_original}.{extension}</code>
 
-<b>Task by:</b> @{message.from_user.username}
+<b>Download by:</b> @{message.from_user.username}
 <b>ID:</b> <code>{message.from_user.id}</code>
-<b>Chat_username:</b> @{message.chat.username}
-**Chat_title:** {message.chat.title}
+
+<b>Chat_username:</b> {'@'+message.chat.username if message.chat.username is not None else None}
+**Chat_title:** __{message.chat.title}__
+**Chat_id:** `{message.chat.id}`
 <b>Time:</b> <code>{message.date}</code>
 
 <b>Link:</b>
-<code>{message.text}</code>
-""")
+{message.text}
+""", disable_web_page_preview=True)
         except:
             await bot.send_message(link_logs, f"""@{message.from_user.username}\n{err_dl_vid_text}\n""")
         
@@ -181,10 +195,10 @@ async def download_video(bot, message): # main function to download the video
 
         try: # using try statement so that code continues when there is an error
             
-            shutil.move(f"{title_final}", f"videos/{title_original}.{extension}") # moving the video file to the folder
+            shutil.move(f"{video_path}", f"videos/{title_original}.{extension}") # moving the video file to the folder
         except: # if that doesn't work...
             print('Error moving file to directory. Deleting file...') # print an error message to the console
-            os.remove(title_final)
+            os.remove(video_path)
             print('File deleted!')
             print(liness)
             return # stop the program
