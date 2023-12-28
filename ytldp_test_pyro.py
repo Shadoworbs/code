@@ -15,6 +15,13 @@ from pyrogram.types import (ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKey
 from pyrogram import enums
 
 
+# importing some texts from replies.py
+from replies import help_text, dl_text, upl_text, about_text, err_dl_vid_text, err_upl_vid_text, start_text
+
+# importing from buttons.py
+from buttons import START_BUTTON, ABOUT_BUTTON, DL_COMPLETE_BUTTON
+
+
 api_id = cfg.api_id
 api_hash = cfg.api_hash
 
@@ -23,7 +30,7 @@ cwd = os.getcwd()
 
 
 ################### adding a link log ############################
-link_logs = -1001707194213
+LINK_LOGS = -1001707194213
 
 
 
@@ -36,34 +43,41 @@ started = datetime.now().strftime('Date: %Y-%m-%d Time: %H:%M')
 # some lines to display at the bottom when everything is done.
 from replies import liness
 
-# importing some texts from replies.py
-from replies import help_text, dl_text, upl_text, about_text, err_dl_vid_text, err_upl_vid_text, start_text
-
 
 
 # creating command handler for /start
-@bot.on_message(filters.command('start'))
+@bot.on_message(filters.command('start') & filters.private)
 async def start_command(bot, message):
+    reply_markup = InlineKeyboardMarkup(START_BUTTON)
     await bot.send_chat_action(message.chat.id, enums.ChatAction.TYPING)
     time.sleep(1)
-    await message.reply(f'Hello {message.from_user.mention} 👀\n{start_text}')
-    
+    await message.reply(text = f'Hello {message.from_user.mention} 👀\n{start_text}',
+                        reply_markup = reply_markup,
+                        disable_web_page_preview = True
+                        )
+
 
 # creating command handler for /help
-@bot.on_message(filters.command('help'))
+@bot.on_message(filters.command('help') & filters.private)
 async def help_command(bot, message):
     await bot.send_chat_action(message.chat.id, enums.ChatAction.TYPING)
     time.sleep(1)
     await message.reply(help_text)
 
 
+
 # creating command handler for /about
-@bot.on_message(filters.command('about'))
+@bot.on_message(filters.command('about') & filters.private)
 async def about_command(bot, message):
+    reply_markup = InlineKeyboardMarkup(ABOUT_BUTTON)
     await bot.send_chat_action(message.chat.id, enums.ChatAction.TYPING)
     time.sleep(1)
-    await message.reply(about_text)
-
+    await message.reply(text = "**Some details about Me**",
+                        reply_markup = reply_markup,
+                        disable_web_page_preview = True
+                        )
+    
+    
 # chat_id = "-1002093827040"
 @bot.on_message(filters.text) #check if the message is a text message
 async def download_video(bot, message): # main function to download the video
@@ -115,7 +129,7 @@ async def download_video(bot, message): # main function to download the video
             for file in os.listdir(cwd):
                 if file.startswith(title_original[:5]) and file.endswith(extension):
                     info.append(os.path.join(cwd, file))
-                    video_path: str = info[-1]
+            video_path: str = info[-1]
 
             
         except:
@@ -170,23 +184,23 @@ async def download_video(bot, message): # main function to download the video
 ################ setting up the link logs ########################
         try:
             
-            await bot.send_message(link_logs, f"""
-<b>Filename:</b>
+            await bot.send_message(LINK_LOGS, f"""
+**Filename:**
 <code>{title_original}.{extension}</code>
 
-<b>Download by:</b> @{message.from_user.username}
-<b>ID:</b> <code>{message.from_user.id}</code>
+**Download by:** @{message.from_user.username}
+**ID:** <code>{message.from_user.id}</code>
 
-<b>Chat_username:</b> {'@'+message.chat.username if message.chat.username is not None else None}
-**Chat_title:** __{message.chat.title}__
+**Chat_username:** {'@'+message.chat.username if message.chat.username is not None else None}
+**Chat_type:** __{message.chat.type}__
 **Chat_id:** `{message.chat.id}`
-<b>Time:</b> <code>{message.date}</code>
+**Time:** `{message.date}`
 
 <b>Link:</b>
 {message.text}
 """, disable_web_page_preview=True)
         except:
-            await bot.send_message(link_logs, f"""@{message.from_user.username}\n{err_dl_vid_text}\n""")
+            await bot.send_message(LINK_LOGS, f"""@{message.from_user.username}\n{err_dl_vid_text}\n""")
         
 
 
