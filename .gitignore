@@ -3,11 +3,10 @@
 /bot_account.session
 /bot_account.session-journal
 /config.py
-/replies.py
 /temp.py
 /*.jpg
 /*.png
 /videos
 /yl.log
 /__pycache__
-*.code-workspace
+/code_series.code-workspace

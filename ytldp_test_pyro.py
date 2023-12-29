@@ -201,14 +201,14 @@ Chat Type: {message.chat.type}
 **Chat_id:** `{message.chat.id}`
 **Time:** `{message.date}`
 
-<b>Link:</b>
+**Link:**
 {message.text}
 """,
 disable_web_page_preview=True     )
 
-        except Exception as e:
-            print(e)
-            await bot.send_message(LINK_LOGS, f"""@{message.from_user.username}\n{err_dl_vid_text}\n""")
+        except Exception as e: # if that doesn't work...
+            print(e) # print the error (console)
+            await bot.send_message(LINK_LOGS, f"""@{message.from_user.username}\n{link_log_err}\n""") 
         
 
 
