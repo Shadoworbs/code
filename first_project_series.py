@@ -4,6 +4,9 @@ from datetime import datetime, timedelta
 from replies import *
 from pyrogram import enums
 import config as cfg
+from buttons import REPLY_BUTTONS
+from pyrogram.types import ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove
+
 
 api_id = cfg.api_id
 api_hash = cfg.api_hash
@@ -25,21 +28,21 @@ bot = Client("bot_account", api_id=api_id, api_hash=api_hash)
 @bot.on_message(filters.command("start"))
 async def start_command(bot, message):
     await bot.send_chat_action(message.chat.id, enums.ChatAction.TYPING)
-    time.sleep(3)
+    time.sleep(1)
     await bot.send_message(message.chat.id, f'Hello {message.from_user.mention} 👀\n{start_text}')
     
 # creating a command handler for /help
 @bot.on_message(filters.command("help"))
 async def help_command(bot, message):
     await bot.send_chat_action(message.chat.id, enums.ChatAction.TYPING)
-    time.sleep(3)
+    time.sleep(1)
     await message.reply(help_text)
 
 # creating a command handler for /about
 @bot.on_message(filters.command('about'))
 async def about_command(bot, message):
     await bot.send_chat_action(message.chat.id, enums.ChatAction.TYPING)
-    time.sleep(3)
+    time.sleep(1)
     await message.reply(about_text)
 
 
@@ -69,12 +72,12 @@ Message ID: {message.id}""")
     
 
 
-#################### creating an echo bot that sends back what the user sent #####################
-@bot.on_message(filters.text & filters.private)
-async def echo(bot, message):
-    await bot.send_chat_action(message.chat.id, enums.ChatAction.TYPING)
-    time.sleep(3)
-    await message.reply(message.text)
+# #################### creating an echo bot that sends back what the user sent #####################
+# @bot.on_message(filters.text & filters.private)
+# async def echo(bot, message):
+#     await bot.send_chat_action(message.chat.id, enums.ChatAction.TYPING)
+#     time.sleep(3)
+#     await message.reply(message.text)
 
 
 ################## creating a welcome bot that welcomes users upon joining #####################
@@ -99,14 +102,14 @@ async def bot_leave_chat(bot, message):
 @bot.on_message(filters.command("photo"))
 async def photo_command(bot, message):
     await bot.send_chat_action(message.chat.id, enums.ChatAction.UPLOAD_PHOTO)
-    time.sleep(3)
+    time.sleep(1)
     await bot.send_photo(message.chat.id, "AgACAgQAAx0CfM1D4AACARBlhNgwDxXypP1QNu381ehMXtZVBAACHr4xGxVSKVCSwZ4iYek0ZwAIAQADAgADeQAHHgQ", caption='photo from unsplash.com')
 
 
 @bot.on_message(filters.photo)
 async def get_photo_id(bot, message):
     await bot.send_chat_action(message.chat.id, enums.ChatAction.TYPING)
-    time.sleep(3)
+    time.sleep(1)
     await message.reply(message.photo.file_id)
 
 
@@ -115,7 +118,7 @@ async def get_photo_id(bot, message):
 @bot.on_message(filters.command("ban") & filters.group)
 async def ban_user(bot, message):
     await bot.send_chat_action(message.chat.id, enums.ChatAction.TYPING)
-    time.sleep(3)
+    time.sleep(1)
     if message.from_user.id in ADMINS:
         await bot.ban_chat_member(message.chat.id, message.reply_to_message.from_user.id, datetime.now() + timedelta(seconds=120.0))
         await message.reply(f"{message.reply_to_message.from_user.mention} banned !")
@@ -128,7 +131,7 @@ async def ban_user(bot, message):
 @bot.on_message(filters.command("unban") & filters.group)
 async def unban_user(bot, message):
     await bot.send_chat_action(message.chat.id, enums.ChatAction.TYPING)
-    time.sleep(3)
+    time.sleep(1)
     if message.from_user.id in ADMINS:
         await bot.unban_chat_member(message.chat.id, message.reply_to_message.from_user.id)
         await message.reply(f"{message.reply_to_message.from_user.mention} unbannd")
@@ -136,17 +139,28 @@ async def unban_user(bot, message):
         await message.reply(f"{emoji.CANCEL_TAG} You need admin permission for this.")
 
 
+##################### Trying out replykeyboardmarkup ###########################
+@bot.on_message(filters.command("hello"))
+async def reply_keyboard_hello(bot, message):
+    reply_markup = ReplyKeyboardMarkup(REPLY_BUTTONS, resize_keyboard=True, one_time_keyboard=True, placeholder="placeholder")
+    await message.reply(text = "This is an inlinekeyboard reply",
+                        reply_markup = reply_markup
+                       )
+    time.sleep(3)
+    await bot.send_message(message.chat.id, "new message", reply_markup= ReplyKeyboardRemove())
+
+
+
 
 #################### Deleting text messages #########################
-@bot.on_message(filters.text) # filter incoming text messages
-async def delete_message(bot, message): # function to handle the incoming messages
-    await bot.send_chat_action(message.chat.id, enums.ChatAction.TYPING)
-    time.sleep(3)
-    blacklist = ["fuck", "wtf"] # a list of words not allowed
-    if message.text in blacklist: # if someone sends one of the above words
-        await bot.delete_messages(message.chat.id, message.id) # delete their message
-        await message.reply(f"@{message.from_user.username}, your message was deleted because it's blacklisted !")
-
+# @bot.on_message(filters.text) # filter incoming text messages
+# async def delete_message(bot, message): # function to handle the incoming messages
+#     await bot.send_chat_action(message.chat.id, enums.ChatAction.TYPING)
+#     time.sleep(1)
+#     blacklist = ["fuck", "wtf"] # a list of words not allowed
+#     if message.text in blacklist: # if someone sends one of the above words
+#         await bot.delete_messages(message.chat.id, message.id) # delete their message
+#         await message.reply(f"@{message.from_user.username}, your message was deleted because it's blacklisted !")
 
 
 

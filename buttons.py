@@ -1,5 +1,4 @@
-from pyrogram.types import (ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton)
-
+from pyrogram.types import ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove
 
 
 START_BUTTON = [
@@ -22,6 +21,18 @@ ABOUT_BUTTON = [
 
 DL_COMPLETE_BUTTON = [
     [
-        InlineKeyboardButton(text="Download complete", url="")
+        InlineKeyboardButton(text = "💻Software💻", url = "https://t.me/+a_rlC_BtkEpmZmVk"),
+        InlineKeyboardButton(text = "🎬Movies🎬", url = "https://t.me/+vA7ql6uZ0ZMxZjU8")
+    ]
+]
+
+REPLY_BUTTONS = [
+    [
+        ("Hi"),
+        ("Hello")
+    ],
+    [
+        ("How is work?"), 
+        ("How are you?")
     ]
 ]
