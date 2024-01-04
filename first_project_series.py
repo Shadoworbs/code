@@ -4,8 +4,18 @@ from datetime import datetime, timedelta
 from replies import *
 from pyrogram import enums
 import config as cfg
-from buttons import REPLY_BUTTONS
-from pyrogram.types import ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove
+import yt_dlp
+from buttons import (DL_COMPLETE_BUTTON, PAGE3_BUTTON, PAGE3_TEXT, REPLY_BUTTONS, 
+                     MAIN_PAGE_BUTTON, 
+                     PAGE2_BUTTON, 
+                     PAGE1_BUTTON, 
+                     PAGE1_TEXT,
+                     PAGE2_TEXT,
+                     MAIN_PAGE_TEXT,
+                     VIDEO_HEIGHT_BUTTON,
+                     VIDEO_HEIGHT_TEXT
+                    )
+from pyrogram.types import ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove, CallbackQuery
 
 
 api_id = cfg.api_id
@@ -161,6 +171,121 @@ async def reply_keyboard_hello(bot, message):
 #     if message.text in blacklist: # if someone sends one of the above words
 #         await bot.delete_messages(message.chat.id, message.id) # delete their message
 #         await message.reply(f"@{message.from_user.username}, your message was deleted because it's blacklisted !")
+INFO_TITLE = []
+INFO_EXTENSION = []
+async def download_vid(height, url):
+    # 'outtmpl':'video','windowsfilenames': '',
+    # options to download the video with i.e video resolution
+    opts = {"format": f"((bv*[fps>=60]/bv*)[height<={height}]/(wv*[fps>=60]/wv*)) + ba / (b[fps>60]/b)[height<={height}]/(w[fps>=60]/w)"}
+    # initiate the extraction process and download the video
+    with yt_dlp.YoutubeDL(opts) as ydl:
+        # assign the extracted data to a variable
+        info_dict = ydl.extract_info(url, download=True)
+        title: str = info_dict.get('title', str) # title of the video
+        extension: str = info_dict.get('ext', str) # extension of the video .mp4, .mkv etc
+        dur: str = info_dict.get('duration_string', str) # duration of the vide
+        res: str = info_dict.get('resolution', str) # resolution of the video
+        upload_date = info_dict.get('upload_date') # date of upload (youtube)
+        id = info_dict.get('id') # unique ID of the video
+        INFO_TITLE.append(title)
+        INFO_EXTENSION.append(extension)
+
+
+##################### Callback Querry ############################
+
+# @bot.on_message(filters.regex("youtu"))
+# async def callback__Query(bot, message):
+#     reply_markup = InlineKeyboardMarkup(MAIN_PAGE_BUTTON)
+#     call_buttons = await message.reply(
+#         MAIN_PAGE_TEXT,
+#         reply_markup = reply_markup
+#     )
+#     LINK.append(message.text)
+    
+LINK = []
+CHAT_ID = []
+MSG_ID = []
+USER_MENTION = []
+USER_ID = []
+MAIN_MSG = []
+@bot.on_message(filters.regex("youtu") & filters.group)
+async def call(bot, message):
+    main_msg = await message.reply(VIDEO_HEIGHT_TEXT, reply_markup=InlineKeyboardMarkup(VIDEO_HEIGHT_BUTTON))
+    LINK.append(message.text)
+    CHAT_ID.append(message.chat.id)
+    MSG_ID.append(message.id)
+    USER_MENTION.append(message.from_user.mention)
+    MAIN_MSG.append(main_msg.id)
+    USER_ID.append(message.from_user.id)
+    
+
+
+# @bot.on_callback_query()
+# async def callback_response(Client, callbackQuery):
+#     if callbackQuery.data == "page1":
+#         await callbackQuery.edit_message_text(
+#             PAGE1_TEXT,
+#             reply_markup = InlineKeyboardMarkup(PAGE1_BUTTON)
+#         )
+#     elif callbackQuery.data == "back_to_main_menu":
+#         await callbackQuery.edit_message_text(
+#             MAIN_PAGE_TEXT,
+#             reply_markup = InlineKeyboardMarkup(MAIN_PAGE_BUTTON)
+#         )
+#     elif callbackQuery.data == "page2":
+#         await callbackQuery.edit_message_text(
+#             PAGE2_TEXT,
+#             reply_markup = InlineKeyboardMarkup(PAGE2_BUTTON)
+#         )
+#     elif callbackQuery.data == "page3":
+#         await callbackQuery.edit_message_text(
+#             PAGE3_TEXT,
+#             reply_markup = InlineKeyboardMarkup(PAGE3_BUTTON)
+#         )
+#     elif callbackQuery.data == "back_to_page_1":
+#             await callbackQuery.edit_message_text(
+#             PAGE1_TEXT,
+#             reply_markup = InlineKeyboardMarkup(PAGE1_BUTTON)
+#         )
+#     elif callbackQuery.data == "back_to_page_2":
+#             await callbackQuery.edit_message_text(
+#             PAGE2_TEXT,
+#             reply_markup = InlineKeyboardMarkup(PAGE2_BUTTON)
+#         )
+#     elif callbackQuery.data == "cancel":
+#         await callbackQuery.edit_message_text("Message Cancelled")
+#         await Client.send_message(CHAT_ID, "IT WORDED!")
+#         download_vid(height=callbackQuery.data, url=LINK[-1])
+
+import os
+cwd = os.getcwd()
+async def getpath():
+    title = INFO_TITLE[-1]
+    extension = INFO_EXTENSION[-1]
+    for file in os.listdir(cwd):
+        if file.startswith(title[0:5]) and file.endswith(extension):
+            path = os.path.join(cwd, file)
+            print(liness)
+            return str(path)
+
+@bot.on_callback_query()
+async def dl(Client, callbackQuery):
+    if callbackQuery.data:
+        await callbackQuery.edit_message_text(f"{dl_text}\n**By:** {USER_MENTION[-1]}\n**User ID:** `{USER_ID[-1]}`")
+        await download_vid(height=callbackQuery.data, url=LINK[-1])
+        await callbackQuery.edit_message_text("**Download Complete**")
+        time.sleep(1)
+        await callbackQuery.edit_message_text(f"{upl_text}\n**By:** {USER_MENTION[-1]}\n**User ID:** `{USER_ID[-1]}`")
+        await bot.send_video(
+            CHAT_ID[-1],
+            await getpath(),
+            reply_markup=InlineKeyboardMarkup(DL_COMPLETE_BUTTON),
+            caption = f"**Hey** {USER_MENTION[-1]}\n{DL_COMPLETE_TEXT}\n**Via:** @pyroseriesrobo",
+            file_name=f"{INFO_TITLE[-1]}.{INFO_EXTENSION[-1]}",
+            reply_to_message_id=MSG_ID[-1]
+        )
+        print(liness)
+        await bot.delete_messages(chat_id=CHAT_ID[-1], message_ids=int(MAIN_MSG[-1]))
 
 
 

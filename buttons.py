@@ -36,3 +36,83 @@ REPLY_BUTTONS = [
         ("How are you?")
     ]
 ]
+
+
+MAIN_PAGE_TEXT = "Do you wish to start reading?"
+MAIN_PAGE_BUTTON = [
+    [
+        InlineKeyboardButton("Start Reading ▶️", callback_data="page1")
+    ],
+    [
+        InlineKeyboardButton("CANCEL", callback_data="cancel")
+    ]
+]
+
+PAGE1_TEXT = "This is the first page, select a resolution."
+PAGE1_BUTTON = [
+    [
+        InlineKeyboardButton("⬅️ BACK", callback_data="back_to_main_menu"),
+        InlineKeyboardButton("PAGE 2 ➡️", callback_data="page2")
+    ],
+    [
+        InlineKeyboardButton("CANCEL", callback_data="cancel")
+    ]
+]
+
+
+PAGE2_TEXT = "This is the second page, select another thing."
+PAGE2_BUTTON = [
+    [
+        InlineKeyboardButton("⬅️ BACK", callback_data="back_to_page_1"),
+        InlineKeyboardButton("PAGE 3 ➡️", callback_data='page3')
+
+    ],
+    [
+        InlineKeyboardButton("CANCEL", callback_data="cancel")
+    ]
+]
+
+
+PAGE3_TEXT = "Now we are on the third page, select the height."
+PAGE3_BUTTON= [
+    [
+        InlineKeyboardButton("⬅️ BACK", callback_data="back_to_page_2"),
+        InlineKeyboardButton("💠 MAIN MENU 💠", callback_data="back_to_main_menu")
+    ],
+    [
+        InlineKeyboardButton("CANCEL", callback_data="cancel")
+    ]
+]
+
+
+VIDEO_HEIGHT_TEXT = "Youtube link detected!\nPlease select a video quality.\nTimout 120 secs [2 mins]"
+VIDEO_HEIGHT_BUTTON = [
+    [
+        InlineKeyboardButton("140p", callback_data="140")
+    ],
+    [
+        InlineKeyboardButton("240p", callback_data="240")
+    ],
+    [
+        InlineKeyboardButton("270p", callback_data="270")
+    ],
+    [
+        InlineKeyboardButton("360p [SD]", callback_data="360")
+    ],
+    [
+        InlineKeyboardButton("480p [SD]", callback_data="480")
+    ],
+    [
+        InlineKeyboardButton("540p", callback_data="540")
+    ],
+    [
+        InlineKeyboardButton("640p", callback_data="640")
+    ],
+    [
+        InlineKeyboardButton("720p [HD]", callback_data="720")
+    ],
+    [
+        InlineKeyboardButton("1080 [HD]", callback_data="1080")
+    ],
+
+]
