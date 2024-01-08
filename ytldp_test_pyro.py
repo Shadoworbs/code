@@ -27,6 +27,7 @@ from buttons import *
 api_id = cfg.api_id
 api_hash = cfg.api_hash
 LINK_LOGS = cfg.LINK_LOGS # Telegram group id
+LOG_CHANNEL = cfg.LOG_CHANNEL
 
 
 # get the current path/directory
