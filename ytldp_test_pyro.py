@@ -13,6 +13,7 @@ import shutil
 import config as cfg
 from pyrogram.types import (ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery)
 from pyrogram import enums
+from pyrogram.errors import FloodWait
 
 
 # importing some texts from replies.py
@@ -33,6 +34,7 @@ cwd = os.getcwd()
 
 
 # Start the client object
+# @pyroseriesrobot
 bot = Client("bot_account")
 
 
@@ -64,6 +66,7 @@ async def about_command(bot, message): # initiate a function to respond to the c
                         reply_markup = InlineKeyboardMarkup(ABOUT_BUTTON),
                         disable_web_page_preview = True
                         )
+
     
 
 # list placeholders to hold global variables
@@ -74,7 +77,7 @@ CHAT_ID = []
 MESSAGE_FROM_USER_ID = []
 USER_MENTION = []
 USER_ID = []
-CALLBACK_MSG_ID = []
+SELETCT_RESOLUTION_MESSAGE_ID = []
 CALLBACK_MESSAGE = []
 INIT_TIME = []
 
@@ -95,129 +98,176 @@ async def download_vid(height, url):
         id = info_dict.get('id') # unique ID of the video
         VIDEO_TITLE.append(title) # add video title as a global variable
         VIDEO_EXTENSION.append(extension) # add video extension as a global variable
+    async def progress(current, total):
+        print(f"Downloaded {current} bytes of {total} bytes ({current * 100 / total:.1f})%")
 
 
 
 @bot.on_message(filters.regex("youtu") & filters.group)
 async def check_youtube_links(bot, message):
-    if len(message.text) > 30:
-        CALLBACK_MSG = await message.reply(VIDEO_HEIGHT_TEXT, reply_markup=InlineKeyboardMarkup(VIDEO_HEIGHT_BUTTON))
-        callback_time = datetime.now().strftime("%Y%m%d%H%M")
-        INIT_TIME.append(int(callback_time))
-        CALLBACK_MESSAGE.append(CALLBACK_MSG)
+    """
+    Check the message sent by the user if its a youtu 
+    """
+    if len(message.text) > 30 and "https://" in message.text:
+        SELETCT_RESOLUTION_MESSAGE = await message.reply(VIDEO_HEIGHT_TEXT, reply_markup=InlineKeyboardMarkup(VIDEO_HEIGHT_BUTTON))
+        SELETCT_RES_MSG_TIME = datetime.now().strftime("%Y%m%d%H%M")
+        INIT_TIME.append(int(SELETCT_RES_MSG_TIME))
+        CALLBACK_MESSAGE.append(SELETCT_RESOLUTION_MESSAGE)
         LINK.append(message.text)
         CHAT_ID.append(message.chat.id)
         MESSAGE_FROM_USER_ID.append(message.id)
         USER_MENTION.append(message.from_user.mention)
-        CALLBACK_MSG_ID.append(CALLBACK_MSG.id)
+        SELETCT_RESOLUTION_MESSAGE_ID.append(SELETCT_RESOLUTION_MESSAGE.id)
         USER_ID.append(message.from_user.id)
 
 
-# function to retrieve the video downloaded
-def get_video_path():
-    """
-    This function will check the current directory and see if there is
-    a video with the same title as the video doenloaded from the link.
-    If there is such a video, return the path of that video as a string.
-    """
-    title = VIDEO_TITLE[-1]
-    extension = VIDEO_EXTENSION[-1]
-    for file in os.listdir(cwd):
-        if file.startswith(title[0:5]) and file.endswith(extension):
-            path = os.path.join(cwd, file)
-            return str(path)
+    # function to retrieve the video downloaded
+    def get_video_path():
+        """
+        This function will check the current directory and see if there is
+        a video with the same title as the video doenloaded from the link.
+        If there is such a video, return the path of that video as a string.
+        """
+        title = VIDEO_TITLE[-1]
+        extension = VIDEO_EXTENSION[-1]
+        for file in os.listdir(cwd):
+            if file.startswith(title[0:5]) and file.endswith(extension):
+                path = os.path.join(cwd, file)
+                return str(path)
 
 
-# function to delete all video files from the directory
-async def remove_all_videos():
-    """
-    This function looks through all the files in the current directory
-    and then if the filename ends with a video format.
-    There is a list conatining all known vido formats.
-    If the video in the directory's extension is in the list of video extensions,
-    delete that video.
-    """
-    for file in os.listdir(cwd):
-        for i in VIDEO_FORMATS:
-            if file.endswith(i):
-                os.remove(file)
+    # function to delete all video files from the directory
+    async def remove_all_videos():
+        """
+        This function looks through all the files in the current directory
+        and then if the filename ends with a video format.
+        There is a list conatining all known vido formats.
+        If the video in the directory's extension is in the list of video extensions,
+        delete that video.
+        """
+        for file in os.listdir(cwd):
+            for i in VIDEO_FORMATS:
+                if file.endswith(i):
+                    os.remove(file)
+
+    # PROGRESS_ARGS = []
+    @bot.on_callback_query()
+    async def youtube_video_downloader_bot(bot, callbackQuery):
+        async def progress(current, total):
+            print(f"Uploaded {current} of {total} bytes ({current * 100 / total:.1f}%)")
+            for i in range(1, total):
+                if current != total:
+                    pass
+                    # await asyncio.sleep(3)
+                    # print("Still uploading...")
+                    
+            # current = current
+            # total = total
+            # PROGRESS_ARGS.append(current)
+            # PROGRESS_ARGS.append(total)
+            # msg_id = status_msg.id
+    #         if current == total //5 or current == total /5:
+    #             await bot.edit_message_text(
+    #                 chat_id=message.chat.id,
+    #                 message_id=msg_id,
+    #                 text=f"""
+    # **Statu: [Uploading]({message.text})**
+
+    # ({current * 100 / total:.1f}%) of {total/1000000:.2f} MB.
+
+    # **By:** {message.from_user.mention}
+    # **ID:** `{message.from_user.id}`
+    # """,
+    # disable_web_page_preview=True,
+    #         )
+        LINK_LOG_BUTTON = [
+            [
+                InlineKeyboardButton("LINK 🔗", url= f"{message.text}")
+            ]
+        ]
+        if callbackQuery.data:
+            if int(datetime.now().strftime("%Y%m%d%H%M")) < int(SELETCT_RES_MSG_TIME) + 2:
+                try:
+                    await bot.delete_messages(message.chat.id, message_ids=int(SELETCT_RESOLUTION_MESSAGE.id))
+                    await asyncio.sleep(1)
+                    status_msg = await bot.send_message(message.chat.id, f"{dl_text}\n**By:** {message.from_user.mention}\n**User ID:** `{message.from_user.id}`")
+                except Exception as e:
+                    print(e)
+                    await bot.send_message(message.chat.id, "You clicked on an old button. Please send a new link.")
+                try:
+                    await download_vid(height=callbackQuery.data, url=message.text)
+                except Exception as e:
+                    print(e)
+                    await bot.delete_messages(message.chat.id,status_msg.id)
+                    await bot.send_message(message.chat.id, f"{message.from_user.mention} **an error occured when downloading.**\n\n`{e}`")
+                    print("\nExiting...\n",liness)
+                    return
+                try:
+                    await bot.edit_message_text(message.chat.id, status_msg.id, f"**Download complete.**")
+                    await asyncio.sleep(1)
+                except Exception as e:
+                    print(e)
+                    print(liness)
+                    await bot.delete_messages(message.chat.id, status_msg.id)
+                    await bot.send_message(message.chat.id, f"This error occured while sending Download complete.\n`{e}`")
+                    return
+                try:
+                    await bot.edit_message_text(message.chat.id, status_msg.id, f"{upl_text}\n**By:** {message.from_user.mention}\n**User ID:** `{message.from_user.id}`")
+                except Exception as e:
+                    print(e)
+                    print(liness)
+                    await bot.delete_messages(message.chat.id, status_msg.id)
+                    await bot.send_message(message.chat.id, f"This error occured when editing a message.\n`{e}`")
+                    return
+                
+                try:
+                    send = await bot.send_video(
+                    message.chat.id,
+                    get_video_path(),
+                    reply_markup=InlineKeyboardMarkup(DL_COMPLETE_BUTTON),
+                    caption = f"**Hey** {message.from_user.mention}\n{DL_COMPLETE_TEXT.format(message.text)}\nVia @pyroseriesrobot",
+                    file_name=f"{VIDEO_TITLE[-1]}.{VIDEO_EXTENSION[-1]}",
+                    reply_to_message_id=message.id,
+                    supports_streaming=True,
+                    progress=progress
+                    )
+                    print(liness)
+                    await bot.delete_messages(message.chat.id, status_msg.id)
+                    # os.remove(get_video_path())
+                except Exception as e:
+                    print(e)
+                    await bot.send_message(message.chat.id, f"{message.from_user.mention} **an error occured while uploading.⚠️**\n\n`{e}`")
+                try:
+                    await bot.send_message(
+                        LINK_LOGS,
+                        f"**Filename:**\n`{VIDEO_TITLE[-1]}.{VIDEO_EXTENSION[-1]}`\n\n**User:** {message.from_user.mention}\n**ID:** `{message.from_user.id}`",
+                        reply_markup= InlineKeyboardMarkup(LINK_LOG_BUTTON)
+                    )
+                except Exception as e:
+                    pass
+                try:
+                    await bot.forward_messages(LOG_CHANNEL, message.chat.id, send.id)
+                except Exception as e:
+                    pass
+            else:
+                await bot.send_message(message.chat.id, f"Hey {message.from_user.mention}\nThis button has expired ⛓. Please send another link 🔗")
 
 
-@bot.on_callback_query()
-async def youtube_video_downloader_bot(Client, callbackQuery):
-    def progress(current, total):
-        print(f"Uploaded {current} of {total} bytes ({current * 100 / total:.1f}%)")
-    if callbackQuery.data:
-        if int(datetime.now().strftime("%Y%m%d%H%M")) < int(INIT_TIME[-1]) + 2:
-            try:
-                await bot.delete_messages(chat_id=CHAT_ID[-1], message_ids=int(CALLBACK_MSG_ID[-1]))
-                await asyncio.sleep(1)
-                statu_msg = await bot.send_message(CHAT_ID[-1], f"{dl_text}\n**By:** {USER_MENTION[-1]}\n**User ID:** `{USER_ID[-1]}`")
-            except Exception as e:
-                print(e)
-                await bot.send_message(CHAT_ID[-1], "You clicked on an old button. Please send a new link.")
-            try:
-                await download_vid(height=callbackQuery.data, url=LINK[-1])
-            except Exception as e:
-                print(e)
-                await bot.delete_messages(CHAT_ID[-1],statu_msg.id)
-                await bot.send_message(CHAT_ID[-1], f"{USER_MENTION[-1]} **an error occured when downloading.**\n\n`{e}`")
-                print("\nExiting...\n",liness)
-                return
-            try:
-                await bot.edit_message_text(CHAT_ID[-1], statu_msg.id, f"**Download complete.**")
-                await asyncio.sleep(1)
-            except Exception as e:
-                print(e)
-                print(liness)
-                await bot.delete_messages(CHAT_ID[-1], statu_msg.id)
-                await bot.send_message(CHAT_ID, f"This error occured while sending Download complete.\n`{e}`")
-                return
-            try:
-                await bot.edit_message_text(CHAT_ID[-1], statu_msg.id, f"{upl_text}\n**By:** {USER_MENTION[-1]}\n**User ID:** `{USER_ID[-1]}`")
-            except Exception as e:
-                print(e)
-                print(liness)
-                await bot.delete_messages(CHAT_ID[-1], statu_msg.id)
-                await bot.send_message(CHAT_ID, f"This error occured when editing a message.\n`{e}`")
-                return
-            
-            try:
-                send = await bot.send_video(
-                CHAT_ID[-1],
-                get_video_path(),
-                reply_markup=InlineKeyboardMarkup(DL_COMPLETE_BUTTON),
-                caption = f"**Hey** {USER_MENTION[-1]}\n{DL_COMPLETE_TEXT.format(LINK[-1])}\nVia @pyroseriesrobot",
-                file_name=f"{VIDEO_TITLE[-1]}.{VIDEO_EXTENSION[-1]}",
-                reply_to_message_id=MESSAGE_FROM_USER_ID[-1],
-                supports_streaming=True,
-                progress=progress
-                )
-                print(liness)
-                await bot.delete_messages(CHAT_ID[-1], statu_msg.id)
-                os.remove(get_video_path())
-            except Exception as e:
-                print(e)
-                await bot.send_message(CHAT_ID[-1], f"⚠️ {USER_MENTION[-1]} **an error occured while uploading.⚠️**\n\n`{e}`")
-        else:
-            await bot.send_message(CHAT_ID[-1], f"Hey {USER_MENTION[-1]}\nThis button has expired ⛓. Please send another link 🔗")
-
-
-# command to delete all videos in directory
-@bot.on_message(filters.command("clean"))
-async def clean_directory(bot, message):
-    deleting = await message.reply("**__Deleting all videos in directory 🗑__**")
-    await asyncio.sleep(3)
-    try:
-        await remove_all_videos()
-    except Exception as e:
-        print(e)
-        pass
-    await deleting.edit("**__All videos removed sucessfully ✅__**")
-    await asyncio.sleep(3)
-    await message.delete(message.text)
-    await asyncio.sleep(1)
-    await deleting.delete()
+    # command to delete all videos in directory
+    @bot.on_message(filters.command("clean"))
+    async def clean_directory(bot, message):
+        deleting = await message.reply("**__Deleting all videos in directory 🗑__**")
+        await asyncio.sleep(3)
+        try:
+            await remove_all_videos()
+        except Exception as e:
+            print(e)
+            pass
+        await deleting.edit("**__All videos removed sucessfully ✅__**")
+        await asyncio.sleep(3)
+        await message.delete(message.text)
+        await asyncio.sleep(1)
+        await deleting.delete()
             
         
 
