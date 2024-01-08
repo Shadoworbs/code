@@ -81,7 +81,7 @@ USER_ID = []
 SELETCT_RESOLUTION_MESSAGE_ID = []
 CALLBACK_MESSAGE = []
 INIT_TIME = []
-
+formats = []
 
 # defining the function to download the video
 async def download_vid(height, url):
@@ -97,6 +97,9 @@ async def download_vid(height, url):
         res: str = info_dict.get('resolution', str) # resolution of the video
         upload_date = info_dict.get('upload_date') # date of upload (youtube)
         id = info_dict.get('id') # unique ID of the video
+        size = info_dict.get('filesize')
+        format = info_dict.get('formats', {})
+        formats.append(format)
         VIDEO_TITLE.append(title) # add video title as a global variable
         VIDEO_EXTENSION.append(extension) # add video extension as a global variable
     async def progress(current, total):
@@ -233,6 +236,7 @@ async def check_youtube_links(bot, message):
                     progress=progress
                     )
                     print(liness)
+                    print(formats)
                     await bot.delete_messages(message.chat.id, status_msg.id)
                     # os.remove(get_video_path())
                 except Exception as e:
