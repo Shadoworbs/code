@@ -157,16 +157,16 @@ async def check_youtube_links(bot, message):
     # PROGRESS_ARGS = []
     @bot.on_callback_query()
     async def youtube_video_downloader_bot(bot, callbackQuery):
-        async def video_progress(current, total):
-            for i in range(1, total):
-                if i < total:
-                    await asyncio.sleep(3)
-                    await SELETCT_RESOLUTION_MESSAGE.edit(f"({current * 100 / total:.1f}%)")
+        # async def video_progress(current, total):
+        #     for i, current in range(1, total):
+        #         if i < total:
+        #             await asyncio.sleep(3)
+        #             await status_msg.edit(f"({current * 100 / total:.1f}%)")
         async def progress(current, total):
             print(f"Uploaded {current} of {total} bytes ({current * 100 / total:.1f}%)")
-            for i in range(1, total):
-                if current != total:
-                    pass
+        #     for i in range(1, total):
+        #         if current != total:
+        #             pass
                     # await asyncio.sleep(3)
                     # print("Still uploading...")
                     
@@ -241,9 +241,8 @@ async def check_youtube_links(bot, message):
                     progress=progress
                     )
                     print(liness)
-                    print(formats)
                     await bot.delete_messages(message.chat.id, status_msg.id)
-                    # os.remove(get_video_path())
+                    os.remove(get_video_path())
                 except Exception as e:
                     print(e)
                     await bot.send_message(message.chat.id, f"{message.from_user.mention} **an error occured while uploading.⚠️**\n\n`{e}`")
