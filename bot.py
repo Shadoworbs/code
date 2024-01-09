@@ -157,6 +157,11 @@ async def check_youtube_links(bot, message):
     # PROGRESS_ARGS = []
     @bot.on_callback_query()
     async def youtube_video_downloader_bot(bot, callbackQuery):
+        async def video_progress(current, total):
+            for i in range(1, total):
+                if i < total:
+                    await asyncio.sleep(3)
+                    await SELETCT_RESOLUTION_MESSAGE.edit(f"({current * 100 / total:.1f}%)")
         async def progress(current, total):
             print(f"Uploaded {current} of {total} bytes ({current * 100 / total:.1f}%)")
             for i in range(1, total):
