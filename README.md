@@ -1,5 +1,7 @@
 # Installation
-Fork this repo and rename config_example.py to config.py
+Fork this repo.
+
+Rename **config_example.py** to **config.py**
 
 Add the necessary details.
 
