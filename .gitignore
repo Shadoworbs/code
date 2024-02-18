@@ -21,3 +21,6 @@
 /*.webm
 /*.opus
 /*.flv
+/.env
+/trash.py
+
