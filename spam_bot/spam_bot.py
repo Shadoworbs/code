@@ -4,7 +4,7 @@ from pyrogram import Client, filters
 from dotenv import load_dotenv
 import os
 import asyncio
-from spam import spam as sp
+from thousand_words import thousand_words as sp
 
 
 # load the environment variables
@@ -115,14 +115,12 @@ async def sendMessage(app, message):
         # delete the user's message
         await message.delete()
         # send a reply to the user
-        not_shadow = await message.reply(f"Hey {message.from_user.mention}\nSorry, you can't use me 🤭.")
+        unauth = await app.send_message(chat_,
+                                     f"Hey {message.from_user.mention}\nSorry, you can't use me 🤭.")
         # wait for 10 seconds
         await asyncio.sleep(10)
         # delete the reply sent to the user
-        await not_shadow.delete()
-
-    # return the function and start listening for a new command
-    return
+        await unauth.delete()
 
 
 # Get bot status
@@ -136,7 +134,7 @@ async def status(app, message):
             print(f"Current task ID: {infos['reply']}")
             # send a reply
             task = await app.send_message(chat_, 
-                                          f"[**Current task ✍️**](https://t.me/GGGLTB/{infos['reply']})",
+                                          f"**[Current task ✍️](https://t.me/GGGLTB/{infos['reply']})**",
                                           disable_web_page_preview=True)
             # wait for 10 seconds
             await asyncio.sleep(10)
@@ -160,16 +158,16 @@ async def status(app, message):
 
     # if the user is not me and the message is sent in the specified chat
     elif message.from_user.id != int(my_id) and message.chat.id == int(chat_) and 'stats' in message.text:
-        # wait for 1 second
-        await asyncio.sleep(1)
+
         # delete the user's message
         await message.delete()
         # send a reply to the user
-        not_shadow = await app.send_message(f"Hey {message.from_user.mention}\nSprru, you can't use me 🤭.")
+        unauth = await app.send_message(chat_, 
+                                            f"Hey {message.from_user.mention}\nSprru, you can't use me 🤭.")
         # wait for 5 seconds
         await asyncio.sleep(5)
         # delete the reply sent to the user
-        await not_shadow.delete()
+        await unauth.delete()
     # stop the function and start listening for a new command
     return
 
@@ -202,16 +200,15 @@ async def stop(app, message):
 
     # if the user is not me and the message is sent in the specified chat
     elif message.from_user.id != int(my_id) and message.chat.id == int(chat_) and 'stop@spam_bot' in message.text:
-        # wait for 1 second
-        await asyncio.sleep(1)
         # delete the user's message
         await message.delete()
         # send a reply to the user
-        not_shadow = await message.reply(f"Hey {message.from_user.mention}\nSorry, you can't use me 🤭.")
+        unauth = await message.reply(chat_, 
+                                     f"Hey {message.from_user.mention}\nSorry, you can't use me 🤭.")
         # wait for 5 seconds
         await asyncio.sleep(5)
         # delete the reply sent to the user
-        await not_shadow.delete()
+        await unauth.delete()
     # stop the function and start listening for a new command
     return
 
@@ -225,4 +222,5 @@ app.run()
 
 # todo:
 # add a restart command
+# fix stats for me not deleting
 
