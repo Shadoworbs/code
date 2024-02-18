@@ -5,7 +5,6 @@ from dotenv import load_dotenv
 import os
 import asyncio
 from spam import spam as sp
-import sys
 
 
 # load the environment variables
@@ -18,7 +17,9 @@ chat_: int = os.getenv("spam_chat_id")
 my_id: int = os.getenv("my_id")
 
 
+# the infos dictionary
 infos = dict()
+# the list of completed tasks
 completed: list = []
 
 
@@ -32,9 +33,11 @@ async def sendMessage(app, message):
         # print a message to the console
         print("Task Started!")
         # messages left
-        mleft = len(sp)
-        msent = 0
-        eta = mleft * 10
+        messages_left = len(sp)
+        # messages sent
+        messages_sent = 0
+        # estimated time of completion
+        eta = messages_left * 10
 
 
         try:
@@ -47,12 +50,12 @@ async def sendMessage(app, message):
                 # delay for 3 seconds
                 await asyncio.sleep(2)
                 # decrease the number of messages left by 1
-                mleft -= 1
+                messages_left -= 1
                 # decrease the ETA by 10
                 eta -= 10
                 # increase the number of messages sent by 1
-                msent += 1
-                # change seconds to hours, minutes and seconds
+                messages_sent += 1
+                # change seconds to (hours, minutes and seconds)
                 seconds: int = eta
                 minutes, seconds = divmod(seconds, 60)
                 hours, minutes = divmod(minutes, 60)
@@ -60,36 +63,66 @@ async def sendMessage(app, message):
                 eta_ = f"{hours}h {minutes}m {seconds}s"
                 # edit the reply message with some text
                 await reply.edit(f"""
-**Total messages:** `{len(sp)}`
-**Messages sent:** `{msent}`
-**Messages left:** `{mleft}`
-**Time left:** `{eta_}`
+**Total messages 💬:** `{len(sp)}`
+**Messages sent 💬:** `{messages_sent}`
+**Messages left 💬:** `{messages_left}`
+**Time left ⏳:** `{eta_}`
 **Made with ❤️ by:** @shadoworbs""")
                 # print messages left
-                print(f'{mleft} messages left', end='\r')
+                print(f'{messages_left} messages left', end='\r')
                 # delay for 1 second
                 await asyncio.sleep(1)
                 # delete the word sent from the list
                 await repl.delete()
-                updated_infos = {"mleft": mleft, "msent": msent, "reply": reply.id}
+                # create an updated infos dict
+                updated_infos = {"messages_left": messages_left, 
+                                 "messages_sent": messages_sent, 
+                                 "reply": reply.id}
+                # update the infos dict the newly created dict
                 infos.update(updated_infos)
+            # append 1 to the completed list (to show how many times the task has been completed)
             completed.append("1")
             # print a message to the console
             print(f'Task Completed {len(completed)} times')
             # send a complete message
-            await app.send_message(chat_, f"""
-I have sent {len(sp) * len(completed)} messages today ✨
-Victory is mine!""")
+            victory = await app.send_message(chat_, f"""
+**Task completed ✅**
+**Total messages 💬:** `{len(sp) * len(completed)}`✨""")
             # delete the reply message
             await reply.delete()
+            # delete the command message
             await message.delete()
+            # wait for 10 seconds
+            await asyncio.sleep(10)
+            # delete the completed message
+            await victory.delete()
         except Exception as e:
             print(e)
-            await app.send_message(chat_, f"@shadoworbs, an error occured\n{e}")
-            await asyncio.sleep(2)
-            await reply.delete()
-            await message.delete()
-            await sys.exit(0)
+            # when there is an error in edit message
+            # delete the current word sent
+            # (may not work because the word may have been deleted already)
+            await repl.delete()
+            # clear the infos dict to show no tasks running
+            infos.clear()
+
+            # return the function and start listening for a new command
+            return
+    
+    # if the user is not me and the message is sent in the specified chat
+    elif message.from_user.id != int(my_id) and message.chat.id == int(chat_) and 'start@spam_bot' in message.text:
+        # wait for 1 second
+        await asyncio.sleep(1)
+        # delete the user's message
+        await message.delete()
+        # send a reply to the user
+        not_shadow = await message.reply(f"Hey {message.from_user.mention}\nSorry, you can't use me 🤭.")
+        # wait for 10 seconds
+        await asyncio.sleep(10)
+        # delete the reply sent to the user
+        await not_shadow.delete()
+
+    # return the function and start listening for a new command
+    return
 
 
 # Get bot status
@@ -97,14 +130,48 @@ Victory is mine!""")
 async def status(app, message):
     # if the user sends the stats command
     if message.from_user.id == int(my_id) and message.chat.id == int(chat_):
-        if len(infos) > 0 and infos["mleft"] > 0 :
+        # if there are tasks running (infos dict is not empty)
+        if len(infos) > 0 and infos["messages_left"] > 0 :
             # print a message to the console
             print(f"Current task ID: {infos['reply']}")
             # send a reply
-            await app.send_message(chat_, "Current task 👆", reply_to_message_id=infos["reply"])
+            task = await app.send_message(chat_, 
+                                          f"[**Current task ✍️**](https://t.me/GGGLTB/{infos['reply']})",
+                                          disable_web_page_preview=True)
+            # wait for 10 seconds
+            await asyncio.sleep(10)
+            # delete the reply sent to the user
+            await task.delete()
+            # delete the user's message
+            await message.delete()
+
+        # if there are no tasks running (infos dict is empty)
         else:
+            # print a message to the console
             print("No tasks running!")
-            await message.reply("No tasks running!")
+            # send a reply
+            task_ = await message.reply("No tasks running!")
+            # wait for 5 seconds
+            await asyncio.sleep(5)
+            # delete the reply
+            await task_.delete()
+        # stop the function and start listening for a new command
+        return
+
+    # if the user is not me and the message is sent in the specified chat
+    elif message.from_user.id != int(my_id) and message.chat.id == int(chat_) and 'stats' in message.text:
+        # wait for 1 second
+        await asyncio.sleep(1)
+        # delete the user's message
+        await message.delete()
+        # send a reply to the user
+        not_shadow = await app.send_message(f"Hey {message.from_user.mention}\nSprru, you can't use me 🤭.")
+        # wait for 5 seconds
+        await asyncio.sleep(5)
+        # delete the reply sent to the user
+        await not_shadow.delete()
+    # stop the function and start listening for a new command
+    return
 
 
 # Stop the bot
@@ -114,21 +181,42 @@ async def stop(app, message):
     if message.from_user.id == int(my_id) and message.chat.id == int(chat_):
         # print a message to the console
         print("Task stopped")
-        # send a reply
+        # send a reply that the bot is stopped
         stopped = await message.reply(f"Bot Stopped by {message.from_user.mention}")
-        # delete the reply message
+        # wait for 1 second
         await asyncio.sleep(1)
+        # delete the user's message
         await message.delete()
+        # wait for 1 second
         await asyncio.sleep(1)
+        # delete the reply sent to the user
         await stopped.delete()
         try:
+            # delete the reply message to deliberately -
+            # cause an error in edit message
+            # that's the only way to stop the task
             await app.delete_messages(chat_, infos["reply"])
         except:
             pass
-        await sys.exit(0)
+        return
+
+    # if the user is not me and the message is sent in the specified chat
+    elif message.from_user.id != int(my_id) and message.chat.id == int(chat_) and 'stop@spam_bot' in message.text:
+        # wait for 1 second
+        await asyncio.sleep(1)
+        # delete the user's message
+        await message.delete()
+        # send a reply to the user
+        not_shadow = await message.reply(f"Hey {message.from_user.mention}\nSorry, you can't use me 🤭.")
+        # wait for 5 seconds
+        await asyncio.sleep(5)
+        # delete the reply sent to the user
+        await not_shadow.delete()
+    # stop the function and start listening for a new command
+    return
 
 
-# app.send_mess
+
 print("Bot Started at " + datetime.now().strftime("%H:%M:%S"))
 app.run()
 
