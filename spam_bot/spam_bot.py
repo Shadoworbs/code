@@ -92,10 +92,6 @@ async def sendMessage(app, message):
             await reply.delete()
             # delete the command message
             await message.delete()
-            # wait for 10 seconds
-            await asyncio.sleep(10)
-            # delete the completed message
-            await victory.delete()
         except Exception as e:
             print(e)
             # when there is an error in edit message
@@ -130,6 +126,7 @@ async def status(app, message):
     if message.from_user.id == int(my_id) and message.chat.id == int(chat_):
         # if there are tasks running (infos dict is not empty)
         if len(infos) > 0 and infos["messages_left"] > 0 :
+            await message.delete()
             # print a message to the console
             print(f"Current task ID: {infos['reply']}")
             # send a reply
@@ -140,13 +137,12 @@ async def status(app, message):
             await asyncio.sleep(10)
             # delete the reply sent to the user
             await task.delete()
-            # delete the user's message
-            await message.delete()
 
         # if there are no tasks running (infos dict is empty)
         else:
             # print a message to the console
             print("No tasks running!")
+            await message.delete()
             # send a reply
             task_ = await message.reply("No tasks running!")
             # wait for 5 seconds
@@ -158,12 +154,13 @@ async def status(app, message):
 
     # if the user is not me and the message is sent in the specified chat
     elif message.from_user.id != int(my_id) and message.chat.id == int(chat_) and 'stats' in message.text:
-
         # delete the user's message
         await message.delete()
+        # wait for 1 second
+        await asyncio.sleep(1)
         # send a reply to the user
-        unauth = await app.send_message(chat_, 
-                                            f"Hey {message.from_user.mention}\nSprru, you can't use me 🤭.")
+        unauth = await app.send_message(chat_,
+                                            f"Hey {message.from_user.mention}\nSorry, you can't use me 🤭.")
         # wait for 5 seconds
         await asyncio.sleep(5)
         # delete the reply sent to the user
@@ -221,6 +218,6 @@ app.run()
 
 
 # todo:
-# add a restart command
-# fix stats for me not deleting
+# add percentage of messages left
+# add progress bar for messages left
 
