@@ -36,12 +36,7 @@ api_hash = os.getenv("api_hash")
 bot_token = os.getenv("bot_token")
 LOG_CHANNEL = os.getenv("LOG_CHANNEL")
 LINK_LOGS = os.getenv("LINK_LOGS")
-AUTH_USERS_STR = os.getenv("AUTH_USERS", "")
-AUTH_USERS = [
-    int(user_id.strip())
-    for user_id in AUTH_USERS_STR.split(",")
-    if user_id.strip().isdigit()
-]
+AUTH_USERS = os.getenv("AUTH_USERS", "")
 SOFTWARE_CHANNEL_ID = os.getenv("SOFTWARE_CHANNEL_ID")
 MOVIE_CHANNEL_ID = os.getenv("MOVIE_CHANNEL_ID")
 SOFTWARE_CHANNEL_LINK = os.getenv("SOFTWARE_CHANNEL_LINK", "https://t.me/+sblvkmvCZ45hMTc0")
