@@ -48,3 +48,7 @@ VIDEO_FORMATS = [".mp4",
                  ".mpegps",
                  ".hevc"
                 ]
+
+
+# Add this if it's not already in replies.py
+VIDEO_HEIGHT_TEXT = "Please select your preferred video quality:"
