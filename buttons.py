@@ -20,12 +20,7 @@ ABOUT_BUTTON = [
     ]
 ]
 
-DL_COMPLETE_BUTTON = [
-    [
-        InlineKeyboardButton(text = "💻Software💻", url = "https://t.me/+a_rlC_BtkEpmZmVk"),
-        InlineKeyboardButton(text = "🎬Movies🎬", url = "https://t.me/+vA7ql6uZ0ZMxZjU8")
-    ]
-]
+DL_COMPLETE_BUTTON = START_BUTTON
 
 REPLY_BUTTONS = [
     [
