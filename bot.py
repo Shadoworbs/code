@@ -29,7 +29,6 @@ from buttons import START_BUTTON, ABOUT_BUTTON, DL_COMPLETE_BUTTON, MEMBERSHIP_B
 # --- Constants ---
 PROGRESS_BAR_LENGTH = 12  # Length of the progress bar
 UPDATE_INTERVAL = 5  # Seconds between progress updates
-MAX_RETRIES = 3  # Max retries for editing messages
 
 load_dotenv()
 api_id = os.getenv("api_id")
@@ -50,12 +49,10 @@ MOVIE_CHANNEL_LINK = os.getenv("MOVIE_CHANNEL_LINK", "https://t.me/telegram")
 
 cwd = os.getcwd()
 BASE_DOWNLOAD_PATH = os.path.join(cwd, "downloads")
-COOKIES_FILE = os.path.join(cwd, "cookies.txt")
 os.makedirs(BASE_DOWNLOAD_PATH, exist_ok=True)
 
 url_cache = {}
 last_update_time = {}
-edit_locks = {}  # To prevent concurrent edits on the same message
 
 bot = Client(
     "bot_account", api_id=api_id, api_hash=api_hash, bot_token=bot_token, workers=16
@@ -150,14 +147,10 @@ async def about_command(client: Client, message):
 
 
 async def get_video_info(url):
-    if not os.path.exists(COOKIES_FILE):
-        print(f"Warning: Cookies file not found at {COOKIES_FILE}")
-
     opts = {
-        "cookiefile": COOKIES_FILE,
+        "cookiefile": "cookies.txt",
         "skip_download": True,
         "quiet": True,
-        "outtmpl": "mp4",
     }
     with yt_dlp.YoutubeDL(opts) as ydl:
         try:
@@ -187,119 +180,103 @@ async def download_vid(
         print(f"Error creating directory {user_download_dir}: {e}")
         raise
 
+    # Create a synchronous progress hook that uses asyncio
     def download_progress_hook(d):
         if d["status"] == "downloading":
             message_id = status_msg.id
             chat_id = status_msg.chat.id
             current_time = time.time()
-            msg_key = (chat_id, message_id)
 
-            if current_time - last_update_time.get(msg_key, 0) > UPDATE_INTERVAL:
-                eta = d.get("_eta_str", "N/A")
+            # Increase update interval to prevent FloodWait
+            if (
+                current_time - last_update_time.get((chat_id, message_id), 0)
+                > UPDATE_INTERVAL
+            ):
+                percentage_str = d.get("_percent_str", "0%").strip("%")
+                try:
+                    percentage_float = float(percentage_str)
+                except ValueError:
+                    percentage_float = 0.0
+
                 speed = d.get("_speed_str", "N/A")
-                downloaded_bytes = d.get("downloaded_bytes", 0)
+                eta = d.get("_eta_str", "N/A")
                 total_bytes = d.get("total_bytes") or d.get("total_bytes_estimate", 0)
-                percentage_str = d.get("_percent_str", "0%")
+                downloaded_bytes = d.get("downloaded_bytes", 0)
 
-                print(
-                    f"Download Progress: {percentage_str}, Speed: {speed}, ETA: {eta}, Bytes: {downloaded_bytes}/{total_bytes}"
+                progress_bar = create_progress_bar(percentage_float)
+                total_mb = total_bytes / (1024 * 1024) if total_bytes else 0
+                downloaded_mb = (
+                    downloaded_bytes / (1024 * 1024) if downloaded_bytes else 0
                 )
 
-                async def update_status():
+                progress_text = (
+                    f"{dl_text}\n"
+                    f"**By:** {user_mention}\n**User ID:** `{user_id}`\n\n"
+                    f"**Progress:** {progress_bar} {percentage_float:.1f}%\n"
+                    f"`{downloaded_mb:.2f} MB / {total_mb:.2f} MB`\n"
+                    f"**Speed:** {speed}\n"
+                    f"**ETA:** {eta}"
+                )
+
+                # Create task in event loop to edit message
+                loop = asyncio.get_event_loop()
+
+                async def update_message():
                     try:
-                        await status_msg.edit_text(
-                            f"**⬇️ Downloading Video...**\n"
-                            f"**Speed:** {speed}\n"
-                            f"**ETA:** {eta}"
-                        )
-                        last_update_time[msg_key] = time.time()
+                        await status_msg.edit_text(progress_text)
+                        last_update_time[(chat_id, message_id)] = current_time
                     except FloodWait as fw:
+                        # Log flood wait and wait slightly longer than suggested
                         print(
-                            f"FloodWait during download status update: sleeping for {fw.value + 1}s"
+                            f"FloodWait during download progress: sleeping for {fw.value + 1}s"
                         )
                         await asyncio.sleep(fw.value + 1)
                     except Exception as e:
-                        if "message is not modified" not in str(e).lower():
-                            print(f"Error updating download status: {e}")
-                        last_update_time[msg_key] = time.time()
+                        # Log other errors but allow potential recovery
+                        print(f"Error editing download status message: {e}")
+                        # Optionally reset time to allow quicker retry if it was temporary
+                        # last_update_time[(chat_id, message_id)] = 0
+                    finally:
+                        # Ensure the time is updated even if an error occurred,
+                        # to prevent rapid retries on persistent errors.
+                        last_update_time[(chat_id, message_id)] = time.time()
 
-                try:
-                    loop = asyncio.get_running_loop()
-                    loop.create_task(update_status())
-                except RuntimeError as loop_err:
-                    print(f"Error getting running loop for download status: {loop_err}")
+                loop.create_task(update_message())
 
         elif d["status"] == "finished":
-            print(f"Download finished hook called: {d.get('filename', 'N/A')}")
+            print(f"Download finished for {d['filename']}")
             message_id = status_msg.id
             chat_id = status_msg.chat.id
-            msg_key = (chat_id, message_id)
-            last_update_time.pop(msg_key, None)
-
-        elif d["status"] == "error":
-            print(f"Download Error Hook: {d}")
+            last_update_time.pop((chat_id, message_id), None)
 
     opts = {
-        "cookiefile": COOKIES_FILE,
-        "format": f"bestvideo[height<={height}][ext=mp4]+bestaudio[ext=m4a]/best[height<={height}][ext=mp4]/best[ext=mp4]",
+        "cookiefile": "cookies.txt",
+        "format": f"((bv*[fps>=60]/bv*)[height<={height}]/(wv*[fps>=60]/wv*)) + ba / (b[fps>60]/b)[height<={height}]/(w[fps>=60]/w)",
         "outtmpl": os.path.join(user_download_dir, "%(title)s_%(id)s.%(ext)s"),
         "progress_hooks": [download_progress_hook],
-        "merge_output_format": "mp4",
+        "quiet": True,
         "no_warnings": True,
-        "verbose": True,
     }
 
-    print(f"Starting download for URL: {url} with options: {opts}")
     with yt_dlp.YoutubeDL(opts) as ydl:
         try:
             info_dict = ydl.extract_info(url, download=True)
-            print(
-                f"yt-dlp extract_info finished. Info dict keys: {info_dict.keys() if info_dict else 'None'}"
-            )
             title = info_dict.get("title", "untitled")
             extension = info_dict.get("ext", "mp4")
             filepath = ydl.prepare_filename(info_dict)
-            print(f"Prepared filename: {filepath}")
-
             if not os.path.exists(filepath):
-                print(
-                    f"File not found at expected path: {filepath}. Checking directory..."
-                )
-                found_file = None
                 for file in os.listdir(user_download_dir):
-                    if info_dict.get("id") in file and file.split(".")[-1] in [
-                        "mp4",
-                        "mkv",
-                        "webm",
-                    ]:
-                        potential_path = os.path.join(user_download_dir, file)
-                        if os.path.exists(potential_path):
-                            found_file = potential_path
-                            extension = file.split(".")[-1]
-                            print(f"Found matching file in directory: {found_file}")
-                            break
-                if found_file:
-                    filepath = found_file
-                else:
-                    print(
-                        f"Error: Downloaded file could not be found for video ID {info_dict.get('id')} in {user_download_dir}"
-                    )
+                    if info_dict.get("id") in file and file.endswith(f".{extension}"):
+                        filepath = os.path.join(user_download_dir, file)
+                        break
+                if not filepath or not os.path.exists(filepath):
                     raise FileNotFoundError(
                         f"Downloaded file not found for video {info_dict.get('id')}"
                     )
-            else:
-                print(f"File found at expected path: {filepath}")
-
         except Exception as download_err:
             print(f"Error during yt-dlp download/extraction: {download_err}")
-            import traceback
-
-            print(traceback.format_exc())
             raise
 
-    print(
-        f"Download function returning: filepath={filepath}, title={title}, extension={extension}"
-    )
     return filepath, title, extension
 
 
@@ -370,10 +347,6 @@ async def handle_callback_query(client: Client, callbackQuery: CallbackQuery):
     user = callbackQuery.from_user
     user_id = user.id
     data = callbackQuery.data
-    original_msg_id = None
-    status_msg = None
-    filepath = None
-    chat_id = callbackQuery.message.chat.id if callbackQuery.message else None
 
     if data == "retry_start":
         await callbackQuery.answer("Checking membership again...")
@@ -389,7 +362,7 @@ async def handle_callback_query(client: Client, callbackQuery: CallbackQuery):
             )
         return
 
-    if await filters.regex(r"^\d+:\d+$")(client, callbackQuery):
+    if filters.regex(r"^\d+:\d+$")(client, callbackQuery):
         if not await check_membership(client, user_id):
             await callbackQuery.answer(
                 "Please join the required channels first and click Retry.",
@@ -397,13 +370,53 @@ async def handle_callback_query(client: Client, callbackQuery: CallbackQuery):
             )
             return
 
+        status_msg = None
+        filepath = None
+
         async def upload_progress(current, total):
-            await asyncio.sleep(5)
+            if total == 0:  # Avoid division by zero
+                return
+            message_id = status_msg.id
+            chat_id = status_msg.chat.id
+            current_time = time.time()
+            # Increase update interval to prevent FloodWait
+            if (
+                current_time - last_update_time.get((chat_id, message_id), 0)
+                > UPDATE_INTERVAL
+            ):
+                percentage = current * 100 / total
+                progress_bar = create_progress_bar(percentage)
+                current_mb = current / (1024 * 1024)
+                total_mb = total / (1024 * 1024)
+
+                progress_text = (
+                    f"{upl_text}\n"
+                    f"**By:** {user.mention}\n**User ID:** `{user_id}`\n\n"
+                    f"**Progress:** {progress_bar} {percentage:.1f}%\n"
+                    f"`{current_mb:.2f} MB / {total_mb:.2f} MB`"
+                )
+                try:
+                    await status_msg.edit_text(progress_text)
+                    last_update_time[(chat_id, message_id)] = current_time
+                except FloodWait as fw:
+                    print(
+                        f"FloodWait during upload progress: sleeping for {fw.value + 1}s"
+                    )
+                    await asyncio.sleep(fw.value + 1)
+                except Exception as e:
+                    print(f"Error editing upload status message: {e}")
+                    # Optionally reset time to allow quicker retry if it was temporary
+                    # last_update_time[(chat_id, message_id)] = 0
+                finally:
+                    # Ensure the time is updated even if an error occurred,
+                    # to prevent rapid retries on persistent errors.
+                    last_update_time[(chat_id, message_id)] = time.time()
 
         try:
             height_str, original_msg_id_str = data.split(":", 1)
             height = int(height_str)
             original_msg_id = int(original_msg_id_str)
+            chat_id = callbackQuery.message.chat.id
 
             url = url_cache.pop(original_msg_id, None)
             if not url:
@@ -426,9 +439,7 @@ async def handle_callback_query(client: Client, callbackQuery: CallbackQuery):
             status_msg = await client.send_message(
                 chat_id, f"{dl_text}\n**By:** {user.mention}\n**User ID:** `{user_id}`"
             )
-            msg_key = (chat_id, status_msg.id)
-            last_update_time[msg_key] = time.time()
-            edit_locks[msg_key] = asyncio.Lock()
+            last_update_time[(chat_id, status_msg.id)] = time.time()
 
             filepath, title, extension = await download_vid(
                 user_id, height, url, status_msg, user.mention
@@ -437,12 +448,14 @@ async def handle_callback_query(client: Client, callbackQuery: CallbackQuery):
             if not filepath or not os.path.exists(filepath):
                 raise Exception("Download failed or file path not found.")
 
-            last_update_time.pop(msg_key, None)
-            edit_locks.pop(msg_key, None)
-
+            last_update_time.pop((chat_id, status_msg.id), None)
             await status_msg.edit_text(f"**Download complete.** Preparing upload...")
             await asyncio.sleep(1)
-            await status_msg.edit_text(f"**⬆️ Uploading Video...**")
+
+            await status_msg.edit_text(
+                f"{upl_text}\n**By:** {user.mention}\n**User ID:** `{user_id}`"
+            )
+            last_update_time[(chat_id, status_msg.id)] = time.time()
 
             send = await client.send_video(
                 chat_id=chat_id,
@@ -455,11 +468,8 @@ async def handle_callback_query(client: Client, callbackQuery: CallbackQuery):
                 progress=upload_progress,
             )
 
-            try:
-                await status_msg.delete()
-                status_msg = None
-            except Exception as del_err:
-                print(f"Could not delete final status message: {del_err}")
+            last_update_time.pop((chat_id, status_msg.id), None)
+            await status_msg.delete()
 
             url_LOG_BUTTON = [[InlineKeyboardButton("url 🔗", url=url)]]
             log_caption = f"**Filename:**\n`{title}.{extension}`\n\n**User:** {user.mention}\n**ID:** `{user_id}`"
@@ -482,47 +492,33 @@ async def handle_callback_query(client: Client, callbackQuery: CallbackQuery):
             print(f"Error in callback handler for user {user_id}: {e}")
             error_message = f"{user.mention} **an error occurred.⚠️**\n\n`{e}`"
             if status_msg:
-                msg_key = (status_msg.chat.id, status_msg.id)
-                last_update_time.pop(msg_key, None)
-                edit_locks.pop(msg_key, None)
                 try:
+                    last_update_time.pop((status_msg.chat.id, status_msg.id), None)
                     await status_msg.edit_text(error_message)
-                except Exception as edit_err:
-                    print(f"Failed to edit status message with error: {edit_err}")
-                    try:
-                        await client.send_message(
-                            chat_id, error_message, reply_to_message_id=original_msg_id
-                        )
-                    except Exception as send_err:
-                        print(f"Failed to send error message: {send_err}")
-            elif chat_id and original_msg_id:
-                try:
+                except Exception:
                     await client.send_message(
                         chat_id, error_message, reply_to_message_id=original_msg_id
                     )
-                except Exception as send_err:
-                    print(f"Failed to send error message: {send_err}")
-
+            else:
+                await client.send_message(
+                    chat_id, error_message, reply_to_message_id=original_msg_id
+                )
             try:
                 await callbackQuery.answer("An error occurred.", show_alert=True)
             except Exception:
                 pass
 
         finally:
-            if status_msg:
-                msg_key = (status_msg.chat.id, status_msg.id)
-                last_update_time.pop(msg_key, None)
-                edit_locks.pop(msg_key, None)
-
             if filepath and os.path.exists(filepath):
                 try:
                     os.remove(filepath)
                     print(f"Removed file: {filepath}")
                 except OSError as rm_err:
                     print(f"Error removing file {filepath}: {rm_err}")
-
-            if original_msg_id:
+            if "original_msg_id" in locals():
                 url_cache.pop(original_msg_id, None)
+            if status_msg:
+                last_update_time.pop((status_msg.chat.id, status_msg.id), None)
 
     else:
         await callbackQuery.answer(
