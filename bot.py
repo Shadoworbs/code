@@ -21,7 +21,7 @@ from pyrogram.types import (
 
 
 from pyrogram import enums
-from pyrogram.errors import FloodWait, UserNotParticipant
+from pyrogram.errors: FloodWait, UserNotParticipant
 import logging
 from replies import *
 from buttons import START_BUTTON, ABOUT_BUTTON, DL_COMPLETE_BUTTON, MEMBERSHIP_BUTTONS
@@ -369,6 +369,8 @@ async def handle_callback_query(client: Client, callbackQuery: CallbackQuery):
                     if "message is not modified" not in str(e).lower():
                         print(f"Error updating upload status: {e}")
                     last_update_time[msg_key] = time.time()
+
+            await asyncio.sleep(5)
 
         try:
             height_str, original_msg_id_str = data.split(":", 1)
