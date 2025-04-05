@@ -241,7 +241,7 @@ async def download_vid(
     return filepath, title, extension
 
 
-async def upload_progress(current, total):
+async def upload_progress(current, total, status_msg, chat_id):
     if total == 0 or status_msg is None:
         return
 
@@ -350,7 +350,7 @@ async def handle_callback_query(client: Client, callbackQuery: CallbackQuery):
             )
         return
 
-    if filters.regex(r"^\d+:\d+$")(client, callbackQuery):
+    if await filters.regex(r"^\d+:\d+$")(client, callbackQuery):  # Add await here
         if not await check_membership(client, user_id):
             await callbackQuery.answer(
                 "Please join the required channels first and click Retry.",
