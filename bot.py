@@ -153,6 +153,7 @@ async def get_video_info(url):
         "cookiefile": "cookies.txt",
         "skip_download": True,
         "quiet": True,
+        "outtmpl": "mp4"
     }
     with yt_dlp.YoutubeDL(opts) as ydl:
         try:
