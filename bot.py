@@ -44,8 +44,8 @@ AUTH_USERS = [
 ]
 SOFTWARE_CHANNEL_ID = os.getenv("SOFTWARE_CHANNEL_ID")
 MOVIE_CHANNEL_ID = os.getenv("MOVIE_CHANNEL_ID")
-SOFTWARE_CHANNEL_LINK = os.getenv("SOFTWARE_CHANNEL_LINK", "https://t.me/telegram")
-MOVIE_CHANNEL_LINK = os.getenv("MOVIE_CHANNEL_LINK", "https://t.me/telegram")
+SOFTWARE_CHANNEL_LINK = os.getenv("SOFTWARE_CHANNEL_LINK", "https://t.me/+sblvkmvCZ45hMTc0")
+MOVIE_CHANNEL_LINK = os.getenv("MOVIE_CHANNEL_LINK", "https://t.me/+BdXh4y_MFqBhZTA0")
 
 cwd = os.getcwd()
 BASE_DOWNLOAD_PATH = os.path.join(cwd, "downloads")
