@@ -21,7 +21,9 @@ from pyrogram.types import (
 
 
 from pyrogram import enums
-from pyrogram.errors import FloodWait, UserNotParticipant
+
+# Import PeerIdInvalid
+from pyrogram.errors import FloodWait, UserNotParticipant, PeerIdInvalid
 import logging
 from replies import *
 from buttons import START_BUTTON, ABOUT_BUTTON, DL_COMPLETE_BUTTON, MEMBERSHIP_BUTTONS
@@ -43,6 +45,11 @@ SOFTWARE_CHANNEL_LINK = os.getenv(
     "SOFTWARE_CHANNEL_LINK", "https://t.me/+sblvkmvCZ45hMTc0"
 )
 MOVIE_CHANNEL_LINK = os.getenv("MOVIE_CHANNEL_LINK", "https://t.me/+BdXh4y_MFqBhZTA0")
+
+# --- Log the loaded Channel IDs ---
+print(f"Loaded SOFTWARE_CHANNEL_ID: {SOFTWARE_CHANNEL_ID}")
+print(f"Loaded MOVIE_CHANNEL_ID: {MOVIE_CHANNEL_ID}")
+# --- End Log ---
 
 cwd = os.getcwd()
 BASE_DOWNLOAD_PATH = os.path.join(cwd, "downloads")
@@ -75,11 +82,28 @@ async def check_membership(client: Client, user_id: int):
         )
         return True
     try:
-        await client.get_chat_member(chat_id=SOFTWARE_CHANNEL_ID, user_id=user_id)
-        await client.get_chat_member(chat_id=MOVIE_CHANNEL_ID, user_id=user_id)
+        # Ensure IDs are integers before using them
+        soft_id = int(SOFTWARE_CHANNEL_ID)
+        mov_id = int(MOVIE_CHANNEL_ID)
+        await client.get_chat_member(chat_id=soft_id, user_id=user_id)
+        await client.get_chat_member(chat_id=mov_id, user_id=user_id)
         return True
     except UserNotParticipant:
         return False
+    # Catch PeerIdInvalid specifically
+    except PeerIdInvalid:
+        print(
+            f"Error checking membership for user {user_id}: PEER_ID_INVALID. "
+            f"Check if Channel IDs ({SOFTWARE_CHANNEL_ID}, {MOVIE_CHANNEL_ID}) are correct numerical IDs "
+            f"and if the bot is a member/admin in both channels."
+        )
+        # Optionally, treat this as 'cannot check' -> allow access or deny based on policy
+        return False  # Or True, depending on how you want to handle this failure
+    except ValueError:
+        print(
+            f"Error: One or both Channel IDs ({SOFTWARE_CHANNEL_ID}, {MOVIE_CHANNEL_ID}) are not valid integers."
+        )
+        return False  # Cannot check membership if IDs are not integers
     except Exception as e:
         print(f"Error checking membership for user {user_id}: {e}")
         return False
