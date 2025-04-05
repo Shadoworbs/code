@@ -45,7 +45,7 @@ async def get_photo(bot, message):
                     text=f"""
 ```Your Info
 Username: {('@' + message.from_user.username) if message.from_user.username else None}
-Firs Name: `{message.from_user.first_name or None}`
+First Name: `{message.from_user.first_name or None}`
 Last Name: `{message.from_user.last_name or None}`
 ID 🆔: `{message.from_user.id}`
 DC ID: `{message.from_user.dc_id}`
