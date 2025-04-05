@@ -18,11 +18,17 @@ from pyrogram.types import (
     InlineKeyboardButton,
     CallbackQuery,
 )
+
+
 from pyrogram import enums
 from pyrogram.errors import FloodWait, UserNotParticipant
 import logging
 from replies import *
 from buttons import START_BUTTON, ABOUT_BUTTON, DL_COMPLETE_BUTTON, MEMBERSHIP_BUTTONS
+
+# --- Constants ---
+PROGRESS_BAR_LENGTH = 12  # Length of the progress bar
+UPDATE_INTERVAL = 5  # Seconds between progress updates
 
 load_dotenv()
 api_id = os.getenv("api_id")
@@ -53,6 +59,16 @@ bot = Client(
 )
 
 now = datetime.now()
+
+
+# --- Helper Function ---
+def create_progress_bar(percentage: float, length: int = PROGRESS_BAR_LENGTH) -> str:
+    """Creates a text-based progress bar."""
+    if not 0 <= percentage <= 100:
+        percentage = max(0, min(100, percentage))  # Clamp percentage
+    filled_length = int(length * percentage // 100)
+    bar = "█" * filled_length + "░" * (length - filled_length)
+    return f"[{bar}]"
 
 
 async def check_membership(client: Client, user_id: int):
@@ -171,17 +187,33 @@ async def download_vid(
             chat_id = status_msg.chat.id
             current_time = time.time()
 
-            if current_time - last_update_time.get((chat_id, message_id), 0) > 3:
-                percentage = d.get("_percent_str", "0%")
+            # Increase update interval to prevent FloodWait
+            if (
+                current_time - last_update_time.get((chat_id, message_id), 0)
+                > UPDATE_INTERVAL
+            ):
+                percentage_str = d.get("_percent_str", "0%").strip("%")
+                try:
+                    percentage_float = float(percentage_str)
+                except ValueError:
+                    percentage_float = 0.0
+
                 speed = d.get("_speed_str", "N/A")
                 eta = d.get("_eta_str", "N/A")
                 total_bytes = d.get("total_bytes") or d.get("total_bytes_estimate", 0)
                 downloaded_bytes = d.get("downloaded_bytes", 0)
 
+                progress_bar = create_progress_bar(percentage_float)
+                total_mb = total_bytes / (1024 * 1024) if total_bytes else 0
+                downloaded_mb = (
+                    downloaded_bytes / (1024 * 1024) if downloaded_bytes else 0
+                )
+
                 progress_text = (
                     f"{dl_text}\n"
                     f"**By:** {user_mention}\n**User ID:** `{user_id}`\n\n"
-                    f"**Progress:** {percentage} of ~{total_bytes / (1024 * 1024):.2f} MB\n"
+                    f"**Progress:** {progress_bar} {percentage_float:.1f}%\n"
+                    f"`{downloaded_mb:.2f} MB / {total_mb:.2f} MB`\n"
                     f"**Speed:** {speed}\n"
                     f"**ETA:** {eta}"
                 )
@@ -194,10 +226,20 @@ async def download_vid(
                         await status_msg.edit_text(progress_text)
                         last_update_time[(chat_id, message_id)] = current_time
                     except FloodWait as fw:
+                        # Log flood wait and wait slightly longer than suggested
+                        print(
+                            f"FloodWait during download progress: sleeping for {fw.value + 1}s"
+                        )
                         await asyncio.sleep(fw.value + 1)
                     except Exception as e:
+                        # Log other errors but allow potential recovery
                         print(f"Error editing download status message: {e}")
-                        last_update_time[(chat_id, message_id)] = 0
+                        # Optionally reset time to allow quicker retry if it was temporary
+                        # last_update_time[(chat_id, message_id)] = 0
+                    finally:
+                        # Ensure the time is updated even if an error occurred,
+                        # to prevent rapid retries on persistent errors.
+                        last_update_time[(chat_id, message_id)] = time.time()
 
                 loop.create_task(update_message())
 
@@ -332,25 +374,43 @@ async def handle_callback_query(client: Client, callbackQuery: CallbackQuery):
         filepath = None
 
         async def upload_progress(current, total):
+            if total == 0:  # Avoid division by zero
+                return
             message_id = status_msg.id
             chat_id = status_msg.chat.id
             current_time = time.time()
-            if current_time - last_update_time.get((chat_id, message_id), 0) > 3:
+            # Increase update interval to prevent FloodWait
+            if (
+                current_time - last_update_time.get((chat_id, message_id), 0)
+                > UPDATE_INTERVAL
+            ):
                 percentage = current * 100 / total
+                progress_bar = create_progress_bar(percentage)
+                current_mb = current / (1024 * 1024)
+                total_mb = total / (1024 * 1024)
+
                 progress_text = (
                     f"{upl_text}\n"
                     f"**By:** {user.mention}\n**User ID:** `{user_id}`\n\n"
-                    f"**Progress:** {percentage:.1f}% ({current / (1024 * 1024):.2f} / {total / (1024 * 1024):.2f} MB)"
+                    f"**Progress:** {progress_bar} {percentage:.1f}%\n"
+                    f"`{current_mb:.2f} MB / {total_mb:.2f} MB`"
                 )
                 try:
                     await status_msg.edit_text(progress_text)
                     last_update_time[(chat_id, message_id)] = current_time
                 except FloodWait as fw:
-                    print(f"FloodWait during upload progress: sleeping for {fw.value}s")
+                    print(
+                        f"FloodWait during upload progress: sleeping for {fw.value + 1}s"
+                    )
                     await asyncio.sleep(fw.value + 1)
                 except Exception as e:
                     print(f"Error editing upload status message: {e}")
-                    last_update_time[(chat_id, message_id)] = 0
+                    # Optionally reset time to allow quicker retry if it was temporary
+                    # last_update_time[(chat_id, message_id)] = 0
+                finally:
+                    # Ensure the time is updated even if an error occurred,
+                    # to prevent rapid retries on persistent errors.
+                    last_update_time[(chat_id, message_id)] = time.time()
 
         try:
             height_str, original_msg_id_str = data.split(":", 1)
