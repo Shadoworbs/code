@@ -21,7 +21,7 @@ from pyrogram.types import (
 
 
 from pyrogram import enums
-from pyrogram.errors: FloodWait, UserNotParticipant
+from pyrogram.errors import FloodWait, UserNotParticipant
 import logging
 from replies import *
 from buttons import START_BUTTON, ABOUT_BUTTON, DL_COMPLETE_BUTTON, MEMBERSHIP_BUTTONS
