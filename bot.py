@@ -50,6 +50,7 @@ MOVIE_CHANNEL_LINK = os.getenv("MOVIE_CHANNEL_LINK", "https://t.me/telegram")
 
 cwd = os.getcwd()
 BASE_DOWNLOAD_PATH = os.path.join(cwd, "downloads")
+COOKIES_FILE = os.path.join(cwd, "cookies.txt")
 os.makedirs(BASE_DOWNLOAD_PATH, exist_ok=True)
 
 url_cache = {}
@@ -149,11 +150,14 @@ async def about_command(client: Client, message):
 
 
 async def get_video_info(url):
+    if not os.path.exists(COOKIES_FILE):
+        print(f"Warning: Cookies file not found at {COOKIES_FILE}")
+
     opts = {
-        "cookiefile": "cookies.txt",
+        "cookiefile": COOKIES_FILE,
         "skip_download": True,
         "quiet": True,
-        "outtmpl": "mp4"
+        "outtmpl": "mp4",
     }
     with yt_dlp.YoutubeDL(opts) as ydl:
         try:
@@ -212,6 +216,7 @@ async def download_vid(
             print(f"Download finished: {d['filename']}")
 
     opts = {
+        "cookiefile": COOKIES_FILE,
         "format": f"bestvideo[height<={height}][ext=mp4]+bestaudio[ext=m4a]/best[height<={height}][ext=mp4]/best[ext=mp4]",
         "outtmpl": os.path.join(user_download_dir, "%(title)s_%(id)s.%(ext)s"),
         "progress_hooks": [download_progress_hook],
