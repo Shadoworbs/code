@@ -342,34 +342,6 @@ async def handle_callback_query(client: Client, callbackQuery: CallbackQuery):
             return
 
         async def upload_progress(current, total):
-            if total == 0 or status_msg is None or chat_id is None:
-                return
-
-            message_id = status_msg.id
-            current_time = time.time()
-            msg_key = (chat_id, message_id)
-
-            if current_time - last_update_time.get(msg_key, 0) > UPDATE_INTERVAL:
-                try:
-                    percentage = (current * 100) / total
-                    current_mb = current / (1024 * 1024)
-                    total_mb = total / (1024 * 1024)
-                    await status_msg.edit_text(
-                        f"**⬆️ Uploading Video...**\n"
-                        f"**Progress:** {percentage:.1f}%\n"
-                        f"**Size:** {current_mb:.1f}MB / {total_mb:.1f}MB"
-                    )
-                    last_update_time[msg_key] = time.time()
-                except FloodWait as fw:
-                    print(
-                        f"FloodWait during upload progress: sleeping for {fw.value + 1}s"
-                    )
-                    await asyncio.sleep(fw.value + 1)
-                except Exception as e:
-                    if "message is not modified" not in str(e).lower():
-                        print(f"Error updating upload status: {e}")
-                    last_update_time[msg_key] = time.time()
-
             await asyncio.sleep(5)
 
         try:
@@ -410,14 +382,11 @@ async def handle_callback_query(client: Client, callbackQuery: CallbackQuery):
                 raise Exception("Download failed or file path not found.")
 
             last_update_time.pop(msg_key, None)
+            edit_locks.pop(msg_key, None)
 
             await status_msg.edit_text(f"**Download complete.** Preparing upload...")
             await asyncio.sleep(1)
-
-            await status_msg.edit_text(
-                f"{upl_text}\n**By:** {user.mention}\n**User ID:** `{user_id}`"
-            )
-            last_update_time[msg_key] = time.time()
+            await status_msg.edit_text(f"**⬆️ Uploading Video...**")
 
             send = await client.send_video(
                 chat_id=chat_id,
@@ -430,8 +399,6 @@ async def handle_callback_query(client: Client, callbackQuery: CallbackQuery):
                 progress=upload_progress,
             )
 
-            last_update_time.pop(msg_key, None)
-            edit_locks.pop(msg_key, None)
             try:
                 await status_msg.delete()
                 status_msg = None
