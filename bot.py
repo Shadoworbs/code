@@ -523,16 +523,24 @@ async def handle_callback_query(client: Client, callbackQuery: CallbackQuery):
             log_caption = f"**Filename:**\n`{title}.{extension}`\n\n**User:** {user.mention}\n**ID:** `{user_id}`"
             if LINK_LOGS:
                 try:
-                    await client.send_message(
+                    await bot.send_message(
                         LINK_LOGS,
                         log_caption,
                         reply_markup=InlineKeyboardMarkup(url_LOG_BUTTON),
+                    )
+                except PeerIdInvalid:
+                    print(
+                        f"Error: LINK_LOGS peer ID invalid. Ensure the bot is a member and has interacted with the chat."
                     )
                 except Exception as log_err:
                     print(f"Error sending link log: {log_err}")
             if LOG_CHANNEL:
                 try:
-                    await client.forward_messages(LOG_CHANNEL, chat_id, send.id)
+                    await bot.forward_messages(LOG_CHANNEL, chat_id, send.id)
+                except PeerIdInvalid:
+                    print(
+                        f"Error: LOG_CHANNEL peer ID invalid. Ensure the bot is a member and has interacted with the chat."
+                    )
                 except Exception as fwd_err:
                     print(f"Error forwarding message: {fwd_err}")
 
