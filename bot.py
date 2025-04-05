@@ -164,11 +164,13 @@ async def download_vid(
         print(f"Error creating directory {user_download_dir}: {e}")
         raise
 
-    async def download_progress_hook(d):
+    # Create a synchronous progress hook that uses asyncio
+    def download_progress_hook(d):
         if d["status"] == "downloading":
             message_id = status_msg.id
             chat_id = status_msg.chat.id
             current_time = time.time()
+
             if current_time - last_update_time.get((chat_id, message_id), 0) > 3:
                 percentage = d.get("_percent_str", "0%")
                 speed = d.get("_speed_str", "N/A")
@@ -183,17 +185,21 @@ async def download_vid(
                     f"**Speed:** {speed}\n"
                     f"**ETA:** {eta}"
                 )
-                try:
-                    await status_msg.edit_text(progress_text)
-                    last_update_time[(chat_id, message_id)] = current_time
-                except FloodWait as fw:
-                    print(
-                        f"FloodWait during download progress: sleeping for {fw.value}s"
-                    )
-                    await asyncio.sleep(fw.value + 1)
-                except Exception as e:
-                    print(f"Error editing download status message: {e}")
-                    last_update_time[(chat_id, message_id)] = 0
+
+                # Create task in event loop to edit message
+                loop = asyncio.get_event_loop()
+
+                async def update_message():
+                    try:
+                        await status_msg.edit_text(progress_text)
+                        last_update_time[(chat_id, message_id)] = current_time
+                    except FloodWait as fw:
+                        await asyncio.sleep(fw.value + 1)
+                    except Exception as e:
+                        print(f"Error editing download status message: {e}")
+                        last_update_time[(chat_id, message_id)] = 0
+
+                loop.create_task(update_message())
 
         elif d["status"] == "finished":
             print(f"Download finished for {d['filename']}")
