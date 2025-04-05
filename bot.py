@@ -251,28 +251,55 @@ async def download_vid(
 
     opts = {
         "cookiefile": "cookies.txt",
-        "format": f"((bv*[fps>=60]/bv*)[height<={height}]/(wv*[fps>=60]/wv*)) + ba / (b[fps>60]/b)[height<={height}]/(w[fps>=60]/w)",
+        # Prioritize mp4 format, then select best video with specified height (or lower) + best audio
+        # Fallback to best available format if mp4 is not directly available
+        "format": f"bestvideo[ext=mp4][height<={height}]+bestaudio[ext=m4a]/bestvideo[height<={height}]+bestaudio/best[height<={height}]/best",
         "outtmpl": os.path.join(user_download_dir, "%(title)s_%(id)s.%(ext)s"),
         "progress_hooks": [download_progress_hook],
         "quiet": True,
         "no_warnings": True,
+        # Add postprocessor to ensure the final output is mp4
+        "postprocessors": [
+            {
+                "key": "FFmpegVideoConvertor",
+                "preferedformat": "mp4",
+            }
+        ],
     }
 
     with yt_dlp.YoutubeDL(opts) as ydl:
         try:
             info_dict = ydl.extract_info(url, download=True)
             title = info_dict.get("title", "untitled")
-            extension = info_dict.get("ext", "mp4")
-            filepath = ydl.prepare_filename(info_dict)
+            # Ensure the extension is mp4 due to the postprocessor
+            extension = "mp4"
+            # Construct the expected final filename after potential remuxing
+            base_filepath = ydl.prepare_filename(info_dict).rsplit(".", 1)[0]
+            filepath = f"{base_filepath}.{extension}"
+
             if not os.path.exists(filepath):
-                for file in os.listdir(user_download_dir):
-                    if info_dict.get("id") in file and file.endswith(f".{extension}"):
-                        filepath = os.path.join(user_download_dir, file)
-                        break
-                if not filepath or not os.path.exists(filepath):
-                    raise FileNotFoundError(
-                        f"Downloaded file not found for video {info_dict.get('id')}"
+                # Check if the original downloaded file exists before remuxing
+                original_ext = info_dict.get("ext")
+                original_filepath = f"{base_filepath}.{original_ext}"
+                if os.path.exists(original_filepath):
+                    print(
+                        f"Original file {original_filepath} found, but remuxed file {filepath} is missing."
                     )
+                    # Attempt to find any mp4 file with the video ID if the constructed path fails
+                    for file in os.listdir(user_download_dir):
+                        if info_dict.get("id") in file and file.endswith(".mp4"):
+                            filepath = os.path.join(user_download_dir, file)
+                            print(f"Found matching mp4 file: {filepath}")
+                            break
+                    if not os.path.exists(filepath):
+                        raise FileNotFoundError(
+                            f"Downloaded file (expected: {filepath}) not found for video {info_dict.get('id')}"
+                        )
+                else:
+                    raise FileNotFoundError(
+                        f"Neither original ({original_filepath}) nor remuxed ({filepath}) file found."
+                    )
+
         except Exception as download_err:
             print(f"Error during yt-dlp download/extraction: {download_err}")
             raise
