@@ -247,29 +247,6 @@ async def download_vid(
     return filepath, title, extension
 
 
-async def upload_progress(current, total, status_msg, chat_id):
-    if total == 0 or status_msg is None:
-        return
-
-    message_id = status_msg.id
-    current_time = time.time()
-    msg_key = (chat_id, message_id)
-
-    if current_time - last_update_time.get(msg_key, 0) > UPDATE_INTERVAL:
-        try:
-            percentage = (current * 100) / total
-            current_mb = current / (1024 * 1024)
-            total_mb = total / (1024 * 1024)
-            await status_msg.edit_text(
-                f"**⬆️ Uploading Video...**\n"
-                f"**Progress:** {percentage:.1f}%\n"
-                f"**Size:** {current_mb:.1f}MB / {total_mb:.1f}MB"
-            )
-            last_update_time[msg_key] = time.time()
-        except Exception as e:
-            print(f"Error updating upload status: {e}")
-
-
 @bot.on_message(filters.regex(r"youtu\.be/|youtube\.com/") & filters.private)
 async def check_youtube_urls(client: Client, message):
     user_id = message.from_user.id
@@ -356,13 +333,42 @@ async def handle_callback_query(client: Client, callbackQuery: CallbackQuery):
             )
         return
 
-    if await filters.regex(r"^\d+:\d+$")(client, callbackQuery):  # Add await here
+    if await filters.regex(r"^\d+:\d+$")(client, callbackQuery):
         if not await check_membership(client, user_id):
             await callbackQuery.answer(
                 "Please join the required channels first and click Retry.",
                 show_alert=True,
             )
             return
+
+        async def upload_progress(current, total):
+            if total == 0 or status_msg is None or chat_id is None:
+                return
+
+            message_id = status_msg.id
+            current_time = time.time()
+            msg_key = (chat_id, message_id)
+
+            if current_time - last_update_time.get(msg_key, 0) > UPDATE_INTERVAL:
+                try:
+                    percentage = (current * 100) / total
+                    current_mb = current / (1024 * 1024)
+                    total_mb = total / (1024 * 1024)
+                    await status_msg.edit_text(
+                        f"**⬆️ Uploading Video...**\n"
+                        f"**Progress:** {percentage:.1f}%\n"
+                        f"**Size:** {current_mb:.1f}MB / {total_mb:.1f}MB"
+                    )
+                    last_update_time[msg_key] = time.time()
+                except FloodWait as fw:
+                    print(
+                        f"FloodWait during upload progress: sleeping for {fw.value + 1}s"
+                    )
+                    await asyncio.sleep(fw.value + 1)
+                except Exception as e:
+                    if "message is not modified" not in str(e).lower():
+                        print(f"Error updating upload status: {e}")
+                    last_update_time[msg_key] = time.time()
 
         try:
             height_str, original_msg_id_str = data.split(":", 1)
