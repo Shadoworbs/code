@@ -29,6 +29,7 @@ from buttons import START_BUTTON, ABOUT_BUTTON, DL_COMPLETE_BUTTON, MEMBERSHIP_B
 # --- Constants ---
 PROGRESS_BAR_LENGTH = 12  # Length of the progress bar
 UPDATE_INTERVAL = 5  # Seconds between progress updates
+MAX_RETRIES = 3  # Max retries for editing messages
 
 load_dotenv()
 api_id = os.getenv("api_id")
@@ -53,6 +54,7 @@ os.makedirs(BASE_DOWNLOAD_PATH, exist_ok=True)
 
 url_cache = {}
 last_update_time = {}
+edit_locks = {}  # To prevent concurrent edits on the same message
 
 bot = Client(
     "bot_account", api_id=api_id, api_hash=api_hash, bot_token=bot_token, workers=16
@@ -186,68 +188,95 @@ async def download_vid(
             message_id = status_msg.id
             chat_id = status_msg.chat.id
             current_time = time.time()
+            msg_key = (chat_id, message_id)
 
-            # Increase update interval to prevent FloodWait
-            if (
-                current_time - last_update_time.get((chat_id, message_id), 0)
-                > UPDATE_INTERVAL
-            ):
-                percentage_str = d.get("_percent_str", "0%").strip("%")
+            # Check if enough time has passed or if it's the first update
+            if current_time - last_update_time.get(msg_key, 0) > UPDATE_INTERVAL:
+                # Acquire lock to prevent concurrent edits
+                if not edit_locks.get(msg_key):
+                    edit_locks[msg_key] = asyncio.Lock()
+
+                async def attempt_edit():
+                    async with edit_locks[
+                        msg_key
+                    ]:  # Ensure only one coroutine edits at a time
+                        # Check time again inside lock in case of waiting
+                        if (
+                            time.time() - last_update_time.get(msg_key, 0)
+                            > UPDATE_INTERVAL
+                        ):
+                            percentage_str = d.get("_percent_str", "0%").strip("%")
+                            try:
+                                percentage_float = float(percentage_str)
+                            except ValueError:
+                                percentage_float = 0.0
+
+                            speed = d.get("_speed_str", "N/A")
+                            eta = d.get("_eta_str", "N/A")
+                            total_bytes = d.get("total_bytes") or d.get(
+                                "total_bytes_estimate", 0
+                            )
+                            downloaded_bytes = d.get("downloaded_bytes", 0)
+
+                            progress_bar = create_progress_bar(percentage_float)
+                            total_mb = total_bytes / (1024 * 1024) if total_bytes else 0
+                            downloaded_mb = (
+                                downloaded_bytes / (1024 * 1024)
+                                if downloaded_bytes
+                                else 0
+                            )
+
+                            progress_text = (
+                                f"{dl_text}\n"
+                                f"**By:** {user_mention}\n**User ID:** `{user_id}`\n\n"
+                                f"**Progress:** {progress_bar} {percentage_float:.1f}%\n"
+                                f"`{downloaded_mb:.2f} MB / {total_mb:.2f} MB`\n"
+                                f"**Speed:** {speed}\n"
+                                f"**ETA:** {eta}"
+                            )
+
+                            retries = 0
+                            while retries < MAX_RETRIES:
+                                try:
+                                    await status_msg.edit_text(progress_text)
+                                    last_update_time[msg_key] = (
+                                        time.time()
+                                    )  # Update time on successful edit
+                                    break  # Exit retry loop on success
+                                except FloodWait as fw:
+                                    print(
+                                        f"FloodWait during download progress: sleeping for {fw.value + 1}s"
+                                    )
+                                    await asyncio.sleep(fw.value + 1)
+                                    retries += 1
+                                except Exception as e:
+                                    print(
+                                        f"Error editing download status message {msg_key}: {e}"
+                                    )
+                                    last_update_time[msg_key] = time.time()
+                                    break
+                            if retries == MAX_RETRIES:
+                                print(
+                                    f"Max retries reached for editing download status {msg_key}"
+                                )
+                                last_update_time[msg_key] = time.time()
+
+                # Schedule the edit attempt in the event loop
                 try:
-                    percentage_float = float(percentage_str)
-                except ValueError:
-                    percentage_float = 0.0
-
-                speed = d.get("_speed_str", "N/A")
-                eta = d.get("_eta_str", "N/A")
-                total_bytes = d.get("total_bytes") or d.get("total_bytes_estimate", 0)
-                downloaded_bytes = d.get("downloaded_bytes", 0)
-
-                progress_bar = create_progress_bar(percentage_float)
-                total_mb = total_bytes / (1024 * 1024) if total_bytes else 0
-                downloaded_mb = (
-                    downloaded_bytes / (1024 * 1024) if downloaded_bytes else 0
-                )
-
-                progress_text = (
-                    f"{dl_text}\n"
-                    f"**By:** {user_mention}\n**User ID:** `{user_id}`\n\n"
-                    f"**Progress:** {progress_bar} {percentage_float:.1f}%\n"
-                    f"`{downloaded_mb:.2f} MB / {total_mb:.2f} MB`\n"
-                    f"**Speed:** {speed}\n"
-                    f"**ETA:** {eta}"
-                )
-
-                # Create task in event loop to edit message
-                loop = asyncio.get_event_loop()
-
-                async def update_message():
-                    try:
-                        await status_msg.edit_text(progress_text)
-                        last_update_time[(chat_id, message_id)] = current_time
-                    except FloodWait as fw:
-                        # Log flood wait and wait slightly longer than suggested
-                        print(
-                            f"FloodWait during download progress: sleeping for {fw.value + 1}s"
-                        )
-                        await asyncio.sleep(fw.value + 1)
-                    except Exception as e:
-                        # Log other errors but allow potential recovery
-                        print(f"Error editing download status message: {e}")
-                        # Optionally reset time to allow quicker retry if it was temporary
-                        # last_update_time[(chat_id, message_id)] = 0
-                    finally:
-                        # Ensure the time is updated even if an error occurred,
-                        # to prevent rapid retries on persistent errors.
-                        last_update_time[(chat_id, message_id)] = time.time()
-
-                loop.create_task(update_message())
+                    loop = asyncio.get_running_loop()
+                    loop.create_task(attempt_edit())
+                except RuntimeError:
+                    print(
+                        "Error: No running event loop found for download progress update."
+                    )
 
         elif d["status"] == "finished":
             print(f"Download finished for {d['filename']}")
             message_id = status_msg.id
             chat_id = status_msg.chat.id
-            last_update_time.pop((chat_id, message_id), None)
+            msg_key = (chat_id, message_id)
+            last_update_time.pop(msg_key, None)
+            edit_locks.pop(msg_key, None)
 
     opts = {
         "cookiefile": "cookies.txt",
@@ -347,6 +376,10 @@ async def handle_callback_query(client: Client, callbackQuery: CallbackQuery):
     user = callbackQuery.from_user
     user_id = user.id
     data = callbackQuery.data
+    original_msg_id = None
+    status_msg = None
+    filepath = None
+    chat_id = callbackQuery.message.chat.id if callbackQuery.message else None
 
     if data == "retry_start":
         await callbackQuery.answer("Checking membership again...")
@@ -370,53 +403,60 @@ async def handle_callback_query(client: Client, callbackQuery: CallbackQuery):
             )
             return
 
-        status_msg = None
-        filepath = None
-
         async def upload_progress(current, total):
-            if total == 0:  # Avoid division by zero
+            if total == 0 or status_msg is None:
                 return
-            message_id = status_msg.id
-            chat_id = status_msg.chat.id
-            current_time = time.time()
-            # Increase update interval to prevent FloodWait
-            if (
-                current_time - last_update_time.get((chat_id, message_id), 0)
-                > UPDATE_INTERVAL
-            ):
-                percentage = current * 100 / total
-                progress_bar = create_progress_bar(percentage)
-                current_mb = current / (1024 * 1024)
-                total_mb = total / (1024 * 1024)
 
-                progress_text = (
-                    f"{upl_text}\n"
-                    f"**By:** {user.mention}\n**User ID:** `{user_id}`\n\n"
-                    f"**Progress:** {progress_bar} {percentage:.1f}%\n"
-                    f"`{current_mb:.2f} MB / {total_mb:.2f} MB`"
-                )
-                try:
-                    await status_msg.edit_text(progress_text)
-                    last_update_time[(chat_id, message_id)] = current_time
-                except FloodWait as fw:
-                    print(
-                        f"FloodWait during upload progress: sleeping for {fw.value + 1}s"
-                    )
-                    await asyncio.sleep(fw.value + 1)
-                except Exception as e:
-                    print(f"Error editing upload status message: {e}")
-                    # Optionally reset time to allow quicker retry if it was temporary
-                    # last_update_time[(chat_id, message_id)] = 0
-                finally:
-                    # Ensure the time is updated even if an error occurred,
-                    # to prevent rapid retries on persistent errors.
-                    last_update_time[(chat_id, message_id)] = time.time()
+            message_id = status_msg.id
+            current_time = time.time()
+            msg_key = (chat_id, message_id)
+
+            if current_time - last_update_time.get(msg_key, 0) > UPDATE_INTERVAL:
+                if not edit_locks.get(msg_key):
+                    edit_locks[msg_key] = asyncio.Lock()
+
+                async with edit_locks[msg_key]:
+                    if time.time() - last_update_time.get(msg_key, 0) > UPDATE_INTERVAL:
+                        percentage = current * 100 / total
+                        progress_bar = create_progress_bar(percentage)
+                        current_mb = current / (1024 * 1024)
+                        total_mb = total / (1024 * 1024)
+
+                        progress_text = (
+                            f"{upl_text}\n"
+                            f"**By:** {user.mention}\n**User ID:** `{user_id}`\n\n"
+                            f"**Progress:** {progress_bar} {percentage:.1f}%\n"
+                            f"`{current_mb:.2f} MB / {total_mb:.2f} MB`"
+                        )
+
+                        retries = 0
+                        while retries < MAX_RETRIES:
+                            try:
+                                await status_msg.edit_text(progress_text)
+                                last_update_time[msg_key] = time.time()
+                                break
+                            except FloodWait as fw:
+                                print(
+                                    f"FloodWait during upload progress: sleeping for {fw.value + 1}s"
+                                )
+                                await asyncio.sleep(fw.value + 1)
+                                retries += 1
+                            except Exception as e:
+                                print(
+                                    f"Error editing upload status message {msg_key}: {e}"
+                                )
+                                last_update_time[msg_key] = time.time()
+                                break
+                        if retries == MAX_RETRIES:
+                            print(
+                                f"Max retries reached for editing upload status {msg_key}"
+                            )
+                            last_update_time[msg_key] = time.time()
 
         try:
             height_str, original_msg_id_str = data.split(":", 1)
             height = int(height_str)
             original_msg_id = int(original_msg_id_str)
-            chat_id = callbackQuery.message.chat.id
 
             url = url_cache.pop(original_msg_id, None)
             if not url:
@@ -439,7 +479,9 @@ async def handle_callback_query(client: Client, callbackQuery: CallbackQuery):
             status_msg = await client.send_message(
                 chat_id, f"{dl_text}\n**By:** {user.mention}\n**User ID:** `{user_id}`"
             )
-            last_update_time[(chat_id, status_msg.id)] = time.time()
+            msg_key = (chat_id, status_msg.id)
+            last_update_time[msg_key] = time.time()
+            edit_locks[msg_key] = asyncio.Lock()
 
             filepath, title, extension = await download_vid(
                 user_id, height, url, status_msg, user.mention
@@ -448,14 +490,15 @@ async def handle_callback_query(client: Client, callbackQuery: CallbackQuery):
             if not filepath or not os.path.exists(filepath):
                 raise Exception("Download failed or file path not found.")
 
-            last_update_time.pop((chat_id, status_msg.id), None)
+            last_update_time.pop(msg_key, None)
+
             await status_msg.edit_text(f"**Download complete.** Preparing upload...")
             await asyncio.sleep(1)
 
             await status_msg.edit_text(
                 f"{upl_text}\n**By:** {user.mention}\n**User ID:** `{user_id}`"
             )
-            last_update_time[(chat_id, status_msg.id)] = time.time()
+            last_update_time[msg_key] = time.time()
 
             send = await client.send_video(
                 chat_id=chat_id,
@@ -468,8 +511,13 @@ async def handle_callback_query(client: Client, callbackQuery: CallbackQuery):
                 progress=upload_progress,
             )
 
-            last_update_time.pop((chat_id, status_msg.id), None)
-            await status_msg.delete()
+            last_update_time.pop(msg_key, None)
+            edit_locks.pop(msg_key, None)
+            try:
+                await status_msg.delete()
+                status_msg = None
+            except Exception as del_err:
+                print(f"Could not delete final status message: {del_err}")
 
             url_LOG_BUTTON = [[InlineKeyboardButton("url 🔗", url=url)]]
             log_caption = f"**Filename:**\n`{title}.{extension}`\n\n**User:** {user.mention}\n**ID:** `{user_id}`"
@@ -492,33 +540,47 @@ async def handle_callback_query(client: Client, callbackQuery: CallbackQuery):
             print(f"Error in callback handler for user {user_id}: {e}")
             error_message = f"{user.mention} **an error occurred.⚠️**\n\n`{e}`"
             if status_msg:
+                msg_key = (status_msg.chat.id, status_msg.id)
+                last_update_time.pop(msg_key, None)
+                edit_locks.pop(msg_key, None)
                 try:
-                    last_update_time.pop((status_msg.chat.id, status_msg.id), None)
                     await status_msg.edit_text(error_message)
-                except Exception:
+                except Exception as edit_err:
+                    print(f"Failed to edit status message with error: {edit_err}")
+                    try:
+                        await client.send_message(
+                            chat_id, error_message, reply_to_message_id=original_msg_id
+                        )
+                    except Exception as send_err:
+                        print(f"Failed to send error message: {send_err}")
+            elif chat_id and original_msg_id:
+                try:
                     await client.send_message(
                         chat_id, error_message, reply_to_message_id=original_msg_id
                     )
-            else:
-                await client.send_message(
-                    chat_id, error_message, reply_to_message_id=original_msg_id
-                )
+                except Exception as send_err:
+                    print(f"Failed to send error message: {send_err}")
+
             try:
                 await callbackQuery.answer("An error occurred.", show_alert=True)
             except Exception:
                 pass
 
         finally:
+            if status_msg:
+                msg_key = (status_msg.chat.id, status_msg.id)
+                last_update_time.pop(msg_key, None)
+                edit_locks.pop(msg_key, None)
+
             if filepath and os.path.exists(filepath):
                 try:
                     os.remove(filepath)
                     print(f"Removed file: {filepath}")
                 except OSError as rm_err:
                     print(f"Error removing file {filepath}: {rm_err}")
-            if "original_msg_id" in locals():
+
+            if original_msg_id:
                 url_cache.pop(original_msg_id, None)
-            if status_msg:
-                last_update_time.pop((status_msg.chat.id, status_msg.id), None)
 
     else:
         await callbackQuery.answer(
