@@ -197,6 +197,13 @@ async def download_vid(
             if current_time - last_update_time.get(msg_key, 0) > UPDATE_INTERVAL:
                 eta = d.get("_eta_str", "N/A")
                 speed = d.get("_speed_str", "N/A")
+                downloaded_bytes = d.get("downloaded_bytes", 0)
+                total_bytes = d.get("total_bytes") or d.get("total_bytes_estimate", 0)
+                percentage_str = d.get("_percent_str", "0%")
+
+                print(
+                    f"Download Progress: {percentage_str}, Speed: {speed}, ETA: {eta}, Bytes: {downloaded_bytes}/{total_bytes}"
+                )
 
                 async def update_status():
                     try:
@@ -206,14 +213,31 @@ async def download_vid(
                             f"**ETA:** {eta}"
                         )
                         last_update_time[msg_key] = time.time()
+                    except FloodWait as fw:
+                        print(
+                            f"FloodWait during download status update: sleeping for {fw.value + 1}s"
+                        )
+                        await asyncio.sleep(fw.value + 1)
                     except Exception as e:
-                        print(f"Error updating download status: {e}")
+                        if "message is not modified" not in str(e).lower():
+                            print(f"Error updating download status: {e}")
+                        last_update_time[msg_key] = time.time()
 
-                loop = asyncio.get_running_loop()
-                loop.create_task(update_status())
+                try:
+                    loop = asyncio.get_running_loop()
+                    loop.create_task(update_status())
+                except RuntimeError as loop_err:
+                    print(f"Error getting running loop for download status: {loop_err}")
 
         elif d["status"] == "finished":
-            print(f"Download finished: {d['filename']}")
+            print(f"Download finished hook called: {d.get('filename', 'N/A')}")
+            message_id = status_msg.id
+            chat_id = status_msg.chat.id
+            msg_key = (chat_id, message_id)
+            last_update_time.pop(msg_key, None)
+
+        elif d["status"] == "error":
+            print(f"Download Error Hook: {d}")
 
     opts = {
         "cookiefile": COOKIES_FILE,
@@ -221,29 +245,61 @@ async def download_vid(
         "outtmpl": os.path.join(user_download_dir, "%(title)s_%(id)s.%(ext)s"),
         "progress_hooks": [download_progress_hook],
         "merge_output_format": "mp4",
-        "quiet": True,
         "no_warnings": True,
+        "verbose": True,
     }
 
+    print(f"Starting download for URL: {url} with options: {opts}")
     with yt_dlp.YoutubeDL(opts) as ydl:
         try:
             info_dict = ydl.extract_info(url, download=True)
+            print(
+                f"yt-dlp extract_info finished. Info dict keys: {info_dict.keys() if info_dict else 'None'}"
+            )
             title = info_dict.get("title", "untitled")
             extension = info_dict.get("ext", "mp4")
             filepath = ydl.prepare_filename(info_dict)
+            print(f"Prepared filename: {filepath}")
+
             if not os.path.exists(filepath):
+                print(
+                    f"File not found at expected path: {filepath}. Checking directory..."
+                )
+                found_file = None
                 for file in os.listdir(user_download_dir):
-                    if info_dict.get("id") in file and file.endswith(f".{extension}"):
-                        filepath = os.path.join(user_download_dir, file)
-                        break
-                if not filepath or not os.path.exists(filepath):
+                    if info_dict.get("id") in file and file.split(".")[-1] in [
+                        "mp4",
+                        "mkv",
+                        "webm",
+                    ]:
+                        potential_path = os.path.join(user_download_dir, file)
+                        if os.path.exists(potential_path):
+                            found_file = potential_path
+                            extension = file.split(".")[-1]
+                            print(f"Found matching file in directory: {found_file}")
+                            break
+                if found_file:
+                    filepath = found_file
+                else:
+                    print(
+                        f"Error: Downloaded file could not be found for video ID {info_dict.get('id')} in {user_download_dir}"
+                    )
                     raise FileNotFoundError(
                         f"Downloaded file not found for video {info_dict.get('id')}"
                     )
+            else:
+                print(f"File found at expected path: {filepath}")
+
         except Exception as download_err:
             print(f"Error during yt-dlp download/extraction: {download_err}")
+            import traceback
+
+            print(traceback.format_exc())
             raise
 
+    print(
+        f"Download function returning: filepath={filepath}, title={title}, extension={extension}"
+    )
     return filepath, title, extension
 
 
