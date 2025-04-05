@@ -99,7 +99,7 @@ async def about_command(bot, message):  # initiate a function to respond to the 
 async def get_video_info(url):
     """Fetches video title and thumbnail URL without downloading."""
     opts = {
-        "cookiefile": "cookies_from_browser firefox",
+        "cookiefile": "cookies.txt",
         "skip_download": True,
         "quiet": True,
     }
@@ -123,7 +123,7 @@ async def download_vid(height, url):
     # options to download the video with i.e video resolution
     # Ensure output filenames are unique or handled appropriately if downloads can overlap
     opts = {
-        "cookiefile": "cookies_from_browser firefox",
+        "cookiefile": "cookies.txt",
         "format": f"((bv*[fps>=60]/bv*)[height<={height}]/(wv*[fps>=60]/wv*)) + ba / (b[fps>60]/b)[height<={height}]/(w[fps>=60]/w)",
         "outtmpl": f"{cwd}/%(title)s_%(id)s.%(ext)s",  # Example: Ensure unique filenames
     }
