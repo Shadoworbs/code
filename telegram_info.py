@@ -68,11 +68,11 @@ Language Code: {message.from_user.language_code}```
                 message.chat.id,
                 f"""
 ```Chat Info:
-First Name: `{(await bot.get_chat(userId)).first_name or None}`
-Last Name: `{(await bot.get_chat(userId)).last_name or None}`
-Username: @{(await bot.get_chat(userId)).username or None}
-ID 🆔: `{(await bot.get_chat(userId)).id}`
-DC ID: `{(await bot.get_chat(userId)).dc_id}```""",
+First Name: `{user_info.first_name or None}`
+Last Name: `{user_info.last_name or None}`
+Username: @{user_info.username or None}
+ID 🆔: `{user_info.id}`
+DC ID: `{user_info.dc_id}```""",
                 reply_to_message_id=message.id,
             )
             await waiting.delete()
