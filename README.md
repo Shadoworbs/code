@@ -22,8 +22,7 @@ A Telegram bot that downloads YouTube videos in various resolutions. Built with 
 1. Clone this repository:
 
 ```bash
-git clone https://github.com/yourusername/youtube-dl-bot.git
-cd youtube-dl-bot
+git clone https://github.com/Shadoworbs/code.git && cd code
 ```
 
 2. Install required packages:

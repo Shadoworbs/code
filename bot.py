@@ -360,6 +360,6 @@ async def exit(bot, message):
 # print to the console
 
 print(f"\nBOT STARTED\n{now:%A, %d %B %Y}. {now:%H:%M}")
-print(f"\nPython version {sys.winver}\n")
+print(f"\nPython version {sys.version_info}\n")
 # run the current program
 bot.run()
