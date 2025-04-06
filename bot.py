@@ -1,15 +1,10 @@
 import sys
-import asyncio
 from datetime import datetime
 
 # Import necessary components from the new package structure
 from bot_package.bot_instance import bot
 from bot_package.config import AUTH_USERS  # Import AUTH_USERS if needed directly here
 
-# Handlers are automatically registered because they use the @bot decorator
-import bot_package.handlers
-import bot_package.helpers
-import bot_package.downloader
 
 # --- Main Execution ---
 if __name__ == "__main__":

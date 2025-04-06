@@ -25,4 +25,11 @@
 /trash.py
 /bot_package/__pycache__
 /bot_package/*.pyc
+/Test_modules
+/downloads
 
+# Ignore all files in the Test_modules directory
+/Test_modules/*
+
+# ignore cookies file
+/cookies.txt

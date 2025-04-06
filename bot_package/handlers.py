@@ -409,7 +409,7 @@ async def handle_callback_query(client: Client, callbackQuery: CallbackQuery):
             log_caption = f"**Filename:**\n`{title}.{extension}`\n\n**User:** {user.mention}\n**ID:** `{user_id}`"
             if LINK_LOGS:
                 try:
-                    link_log_id = int(LINK_LOGS)
+                    link_log_id = LINK_LOGS
                     url_LOG_BUTTON = [
                         [InlineKeyboardButton("Original URL 🔗", url=url)]
                     ]
@@ -431,7 +431,7 @@ async def handle_callback_query(client: Client, callbackQuery: CallbackQuery):
 
             if LOG_CHANNEL:
                 try:
-                    log_channel_id = int(LOG_CHANNEL)
+                    log_channel_id = LOG_CHANNEL
                     await bot.forward_messages(log_channel_id, chat_id, send.id)
                 except ValueError:
                     print(
