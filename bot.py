@@ -410,7 +410,7 @@ async def handle_callback_query(client: Client, callbackQuery: CallbackQuery):
             )
         return
 
-    if filters.regex(r"^\d+:\d+$")(client, callbackQuery):
+    if await filters.regex(r"^\d+:\d+$")(client, callbackQuery):
         if not await check_membership(client, user_id):
             await callbackQuery.answer(
                 "Please join the required channels first and click Retry.",
