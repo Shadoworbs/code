@@ -24,5 +24,9 @@
 /.env
 /trash.py
 /bot_package/__pycache__
+/bot_package/__pycache__/*.pyc
+/bot_package_*/__pycache__/*.pyc
 /bot_package/*.pyc
+/bot_package_*/__pycache__
+/bot_package_*/*.pyc
 
