@@ -23,4 +23,6 @@
 /*.flv
 /.env
 /trash.py
+/bot_package/__pycache__
+/bot_package/*.pyc
 
