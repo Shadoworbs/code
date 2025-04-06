@@ -1,5 +1,6 @@
 import os
 from dotenv import load_dotenv
+import ast  # Import ast for literal evaluation
 
 load_dotenv()
 
@@ -13,7 +14,22 @@ API_HASH = os.getenv("api_hash")
 BOT_TOKEN = os.getenv("bot_token")
 LOG_CHANNEL = os.getenv("LOG_CHANNEL")
 LINK_LOGS = os.getenv("LINK_LOGS")
-AUTH_USERS = os.getenv("AUTH_USERS", "")
+# Parse AUTH_USERS from string representation of list to actual list
+auth_users_str = os.getenv("AUTH_USERS", "[]")  # Default to empty list string
+try:
+    AUTH_USERS = ast.literal_eval(auth_users_str)
+    # Ensure it's a list of strings
+    if not isinstance(AUTH_USERS, list) or not all(
+        isinstance(item, str) for item in AUTH_USERS
+    ):
+        print(
+            f"Warning: AUTH_USERS ('{auth_users_str}') is not a valid list of strings. Using empty list."
+        )
+        AUTH_USERS = []
+except (ValueError, SyntaxError) as e:
+    print(f"Error parsing AUTH_USERS: {e}. Using empty list.")
+    AUTH_USERS = []
+
 SOFTWARE_CHANNEL_ID = os.getenv("SOFTWARE_CHANNEL_ID")
 MOVIE_CHANNEL_ID = os.getenv("MOVIE_CHANNEL_ID")
 SOFTWARE_CHANNEL_LINK = os.getenv(
