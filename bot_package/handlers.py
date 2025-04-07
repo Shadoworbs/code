@@ -40,6 +40,7 @@ from buttons import (
 
 @bot.on_message(filters.command("start") & filters.private)
 async def start_command(client: Client, message):
+    print(f"Start command received from user {message.from_user.id}")
     user_id = message.from_user.id
     if not await check_membership(client, user_id):
         await message.reply(
@@ -57,6 +58,8 @@ async def start_command(client: Client, message):
 
 @bot.on_message(filters.command("help") & filters.private)
 async def help_command(client: Client, message):
+    print(f"Help command received from user {message.from_user.id}")
+
     user_id = message.from_user.id
     if not await check_membership(client, user_id):
         await message.reply(
@@ -70,6 +73,7 @@ async def help_command(client: Client, message):
 
 @bot.on_message(filters.command("about") & filters.private)
 async def about_command(client: Client, message):
+    print(f"About command received from user {message.from_user.id}")
     user_id = message.from_user.id
     if not await check_membership(client, user_id):
         await message.reply(

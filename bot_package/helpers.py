@@ -128,7 +128,7 @@ async def edit_status_message(status_msg, text: str):
             # Log other errors but allow potential recovery
             print(f"Error editing status message: {e}")
             # Optionally reset time to allow quicker retry if it was temporary
-            # last_update_time[(chat_id, message_id)] = 0
+            last_update_time[(chat_id, message_id)] = 0
         finally:
             # Ensure the time is updated even if an error occurred,
             # to prevent rapid retries on persistent errors.

@@ -1,9 +1,11 @@
 import sys
 from datetime import datetime
+import pyrogram
 
 # Import necessary components from the new package structure
 from bot_package.bot_instance import bot
-from bot_package.config import AUTH_USERS  # Import AUTH_USERS if needed directly here
+import bot_package.helpers as helpers
+from bot_package import handlers
 
 
 # --- Main Execution ---
@@ -13,8 +15,6 @@ if __name__ == "__main__":
     print(f"BOT STARTING")
     print(f"{now:%A, %d %B %Y} - {now:%H:%M:%S}")
     print(f"Python: {sys.version.split()[0]}")
-    # You can add Pyrogram version here if needed:
-    import pyrogram
     print(f"Pyrogram: {pyrogram.__version__}")
     print("-" * 30)
 
