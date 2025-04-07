@@ -23,6 +23,13 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"FATAL ERROR: Bot crashed with exception: {e}")
         # Consider adding more robust error logging here
+    except KeyboardInterrupt:
+        print("Bot stopped by user.")
+    except SystemExit:
+        print("System exit requested.")
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+        # Handle other exceptions as needed
     finally:
         print("-" * 30)
         print("BOT STOPPED")
