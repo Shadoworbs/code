@@ -303,7 +303,7 @@ async def handle_callback_query(client: Client, callbackQuery: CallbackQuery):
 
             await message.delete()
             await callbackQuery.answer("✅ Request cancelled.")
-            print(f"Cancelled request for message {original_msg_id} by user {user_id}")
+            print(f"Cancelled request for message {original_msg_id} by user {user_id} ({user.first_name})")
         except Exception as e:
             print(f"Error handling cancel callback: {e}")
             await callbackQuery.answer("⚠️ Error cancelling request.", show_alert=True)
@@ -431,7 +431,7 @@ async def handle_callback_query(client: Client, callbackQuery: CallbackQuery):
                 try:
                     link_log_id = LINK_LOGS
                     url_LOG_BUTTON = [
-                        [InlineKeyboardButton("Original URL 🔗", url=url)]
+                        [InlineKeyboardButton("URL 🔗", url=url)]
                     ]
                     await bot.send_message(
                         link_log_id,
