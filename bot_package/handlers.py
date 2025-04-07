@@ -411,6 +411,22 @@ async def handle_callback_query(client: Client, callbackQuery: CallbackQuery):
             await status_msg.delete()
 
             log_caption = f"**Filename:**\n`{title}.{extension}`\n\n**User:** {user.mention}\n**ID:** `{user_id}`"
+
+            if LOG_CHANNEL:
+                try:
+                    log_channel_id = LOG_CHANNEL
+                    await bot.forward_messages(log_channel_id, chat_id, send.id)
+                except ValueError:
+                    print(
+                        f"Error: LOG_CHANNEL ('{LOG_CHANNEL}') is not a valid integer chat ID."
+                    )
+                except PeerIdInvalid:
+                    print(
+                        f"Error: LOG_CHANNEL peer ID ({LOG_CHANNEL}) invalid. Ensure the bot is a member and has interacted with the chat."
+                    )
+                except Exception as fwd_err:
+                    print(f"Error forwarding message to {LOG_CHANNEL}: {fwd_err}")
+
             if LINK_LOGS:
                 try:
                     link_log_id = LINK_LOGS
@@ -432,21 +448,6 @@ async def handle_callback_query(client: Client, callbackQuery: CallbackQuery):
                     )
                 except Exception as log_err:
                     print(f"Error sending link log to {LINK_LOGS}: {log_err}")
-
-            if LOG_CHANNEL:
-                try:
-                    log_channel_id = LOG_CHANNEL
-                    await bot.forward_messages(log_channel_id, chat_id, send.id)
-                except ValueError:
-                    print(
-                        f"Error: LOG_CHANNEL ('{LOG_CHANNEL}') is not a valid integer chat ID."
-                    )
-                except PeerIdInvalid:
-                    print(
-                        f"Error: LOG_CHANNEL peer ID ({LOG_CHANNEL}) invalid. Ensure the bot is a member and has interacted with the chat."
-                    )
-                except Exception as fwd_err:
-                    print(f"Error forwarding message to {LOG_CHANNEL}: {fwd_err}")
 
         except Exception as e:
             print(f"Error in callback handler for user {user_id}, data '{data}': {e}")
