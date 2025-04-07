@@ -27,6 +27,10 @@
 /Test_modules
 /__pycache__/*.pyc
 
+# everything in the bot_package/__pycache__ folder
+/bot_package/__pycache__/*
+/bot_package/__pycache__/__init__.*
+
 
 
 # cookies
