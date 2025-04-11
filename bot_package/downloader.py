@@ -4,6 +4,7 @@ import asyncio
 import time
 from pyrogram import Client
 from pyrogram.errors import FloodWait
+from pyrogram.types import InlineKeyboardMarkup  # Add this import
 from .config import last_update_time, UPDATE_INTERVAL, active_downloads
 from .helpers import (
     create_progress_bar,
@@ -44,7 +45,14 @@ async def get_video_info(url: str):
 
 
 def _run_yt_dlp_download(
-    opts, url, loop, status_msg, user_mention, user_id, original_msg_id
+    opts,
+    url,
+    loop,
+    status_msg,
+    user_mention,
+    user_id,
+    original_msg_id,
+    cancel_button_markup: InlineKeyboardMarkup,  # Add markup parameter
 ):
     """Synchronous function to run yt-dlp download, designed for asyncio.to_thread."""
 
@@ -98,7 +106,10 @@ def _run_yt_dlp_download(
 
                 # Schedule the edit_status_message coroutine on the main event loop
                 asyncio.run_coroutine_threadsafe(
-                    edit_status_message(status_msg, progress_text), loop
+                    edit_status_message(
+                        status_msg, progress_text, reply_markup=cancel_button_markup
+                    ),  # Pass markup here
+                    loop,
                 )
                 # Update time locally in this thread to avoid race conditions if needed,
                 # but primary check relies on main thread's last_update_time
@@ -175,6 +186,7 @@ async def download_video_async(
     status_msg: Client.send_message,
     user_mention: str,
     original_msg_id: int,
+    cancel_button_markup: InlineKeyboardMarkup,  # Add markup parameter
 ):
     """Asynchronously downloads a video using yt-dlp in a separate thread."""
 
@@ -206,6 +218,7 @@ async def download_video_async(
             user_mention,
             user_id,
             original_msg_id,
+            cancel_button_markup,  # Pass markup here
         )
         return filepath, title, extension
     except asyncio.CancelledError:

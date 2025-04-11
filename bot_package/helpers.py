@@ -105,22 +105,27 @@ def get_resolution_buttons(message_id: int) -> InlineKeyboardMarkup:
 
 
 # --- Progress Update Helper ---
-async def edit_status_message(status_msg, text: str):
-    """Safely edits a status message, handling FloodWait."""
+async def edit_status_message(
+    status_msg, text: str, reply_markup=None
+):  # Add reply_markup parameter
+    """Safely edits a status message, handling FloodWait and preserving markup."""
     message_id = status_msg.id
     chat_id = status_msg.chat.id
     current_time = time.time()
 
+    # Check if enough time has passed since the last update
     if current_time - last_update_time.get((chat_id, message_id), 0) > UPDATE_INTERVAL:
         try:
-            await status_msg.edit_text(text)
+            # Pass reply_markup to edit_text
+            await status_msg.edit_text(text, reply_markup=reply_markup)
             last_update_time[(chat_id, message_id)] = current_time
         except FloodWait as fw:
             print(f"FloodWait: sleeping for {fw.value + 1}s")
             await asyncio.sleep(fw.value + 1)
             # Retry after waiting
             try:
-                await status_msg.edit_text(text)
+                # Pass reply_markup on retry as well
+                await status_msg.edit_text(text, reply_markup=reply_markup)
                 last_update_time[(chat_id, message_id)] = current_time
             except Exception as e_retry:
                 print(f"Error editing status message after FloodWait: {e_retry}")
@@ -129,11 +134,7 @@ async def edit_status_message(status_msg, text: str):
             print(f"Error editing status message: {e}")
             # Optionally reset time to allow quicker retry if it was temporary
             last_update_time[(chat_id, message_id)] = 0
-        finally:
-            # Ensure the time is updated even if an error occurred,
-            # to prevent rapid retries on persistent errors.
-            # Update time only on successful edit or after handling FloodWait successfully
-            pass  # Time is updated inside the try blocks now
+        # No finally block needed here for time update, handled in try blocks
 
 
 def cleanup_progress_state(chat_id: int, message_id: int):
