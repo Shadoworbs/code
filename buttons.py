@@ -10,10 +10,12 @@ START_BUTTON = [
     [
         InlineKeyboardButton(
             text="💻Software Channel💻", url="https://t.me/+a_rlC_BtkEpmZmVk"
-        ),
+        )
+    ],
+    [
         InlineKeyboardButton(
             text="🎬Movie Channel🎬", url="https://t.me/+vA7ql6uZ0ZMxZjU8"
-        ),
+        )
     ]
 ]
 
