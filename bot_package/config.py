@@ -30,16 +30,8 @@ except (ValueError, SyntaxError) as e:
     print(f"Error parsing AUTH_USERS: {e}. Using empty list.")
     AUTH_USERS = []
 
-SOFTWARE_CHANNEL_ID = os.getenv("SOFTWARE_CHANNEL_ID")
-MOVIE_CHANNEL_ID = os.getenv("MOVIE_CHANNEL_ID")
-SOFTWARE_CHANNEL_LINK = os.getenv(
-    "SOFTWARE_CHANNEL_LINK", "https://t.me/+sblvkmvCZ45hMTc0")
-MOVIE_CHANNEL_LINK = os.getenv(
-    "MOVIE_CHANNEL_LINK", "https://t.me/+rdIeLdDh0uVlMjFk") #"https://t.me/+BdXh4y_MFqBhZTA0")
 
 # --- Log the loaded Channel IDs ---
-print(f"Loaded SOFTWARE_CHANNEL_ID: {SOFTWARE_CHANNEL_ID}")
-print(f"Loaded MOVIE_CHANNEL_ID: {MOVIE_CHANNEL_ID}")
 print(f"Loaded LOG_CHANNEL: {LOG_CHANNEL}")
 print(f"Loaded LINK_LOGS: {LINK_LOGS}")
 print(f"Loaded AUTH_USERS: {AUTH_USERS}")

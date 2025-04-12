@@ -19,7 +19,6 @@ from .config import (
     active_downloads,
 )
 from .helpers import (
-    check_membership,
     get_membership_buttons,
     get_resolution_buttons,
     create_progress_bar,
@@ -40,15 +39,7 @@ from buttons import (
 
 @bot.on_message(filters.command("start") & filters.private)
 async def start_command(client: Client, message):
-    print(f"Start command received from user {message.from_user.id}")
     user_id = message.from_user.id
-    if not await check_membership(client, user_id):
-        await message.reply(
-            text=membership_fail_text.format(mention=message.from_user.mention),
-            reply_markup=get_membership_buttons(),
-            disable_web_page_preview=True,
-        )
-        return
     await message.reply(
         text=f"{start_text.format(message.from_user.mention)}",
         reply_markup=InlineKeyboardMarkup(START_BUTTON),
@@ -61,13 +52,6 @@ async def help_command(client: Client, message):
     print(f"Help command received from user {message.from_user.id}")
 
     user_id = message.from_user.id
-    if not await check_membership(client, user_id):
-        await message.reply(
-            text=membership_fail_text.format(mention=message.from_user.mention),
-            reply_markup=get_membership_buttons(),
-            disable_web_page_preview=True,
-        )
-        return
     await message.reply(help_text)
 
 
@@ -75,13 +59,6 @@ async def help_command(client: Client, message):
 async def about_command(client: Client, message):
     print(f"About command received from user {message.from_user.id}")
     user_id = message.from_user.id
-    if not await check_membership(client, user_id):
-        await message.reply(
-            text=membership_fail_text.format(mention=message.from_user.mention),
-            reply_markup=get_membership_buttons(),
-            disable_web_page_preview=True,
-        )
-        return
     await message.reply(
         text="**💁 Some details about Me 💁**",
         reply_markup=InlineKeyboardMarkup(ABOUT_BUTTON),
@@ -216,13 +193,6 @@ async def restart_command(client: Client, message):
 )
 async def youtube_url_handler(client: Client, message):
     user_id = message.from_user.id
-    if not await check_membership(client, user_id):
-        await message.reply(
-            text=membership_fail_text.format(mention=message.from_user.mention),
-            reply_markup=get_membership_buttons(),
-            disable_web_page_preview=True,
-        )
-        return
 
     url = message.text.strip()
     if not ("youtu" in url or "youtube" in url):
@@ -284,25 +254,6 @@ async def handle_callback_query(client: Client, callbackQuery: CallbackQuery):
     status_msg = None  # Initialize outside try block
     chat_id = message.chat.id if message else None  # Initialize chat_id
 
-    # --- Retry Start Logic ---
-    if data == "retry_start":
-        await callbackQuery.answer("Checking membership again...")
-        if await check_membership(client, user_id):
-            try:
-                await message.delete()
-            except Exception:
-                pass
-            await client.send_message(
-                chat_id=user_id,
-                text=f"{start_text.format(user.mention)}",
-                reply_markup=InlineKeyboardMarkup(START_BUTTON),
-                disable_web_page_preview=True,
-            )
-        else:
-            await callbackQuery.answer(
-                "❌ You still need to join the required channels.", show_alert=True
-            )
-        return
 
     # --- Cancel Logic (Handles cancellation from resolution buttons AND status message) ---
     if data.startswith("cancel:"):
@@ -343,14 +294,6 @@ async def handle_callback_query(client: Client, callbackQuery: CallbackQuery):
         and data.split(":", 1)[0].isdigit()
         and data.split(":", 1)[1].isdigit()
     ):
-        # Check membership again before proceeding
-        if not await check_membership(client, user_id):
-            await callbackQuery.answer(
-                "🔒 Please join the required channels first and click Retry.",
-                show_alert=True,
-            )
-            return
-
         try:
             height_str, original_msg_id_str = data.split(":", 1)
             height = int(height_str)

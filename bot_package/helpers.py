@@ -6,15 +6,9 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from pyrogram.errors import UserNotParticipant, PeerIdInvalid, FloodWait, ChannelInvalid
 from .config import (
     PROGRESS_BAR_LENGTH,
-    SOFTWARE_CHANNEL_ID,
-    MOVIE_CHANNEL_ID,
-    SOFTWARE_CHANNEL_LINK,
-    MOVIE_CHANNEL_LINK,
     last_update_time,
     UPDATE_INTERVAL,
 )
-from replies import membership_fail_text  # Assuming replies.py exists
-
 
 # --- Progress Bar ---
 def create_progress_bar(percentage: float, length: int = PROGRESS_BAR_LENGTH) -> str:
@@ -24,67 +18,6 @@ def create_progress_bar(percentage: float, length: int = PROGRESS_BAR_LENGTH) ->
     filled_length = int(length * percentage // 100)
     bar = "█" * filled_length + "░" * (length - filled_length)
     return f"[{bar}]"
-
-
-# --- Membership Check ---
-async def check_membership(client: Client, user_id: int) -> bool:
-    """Checks if a user is a member of the required channels."""
-    if not SOFTWARE_CHANNEL_ID or not MOVIE_CHANNEL_ID:
-        print(
-            "Warning: SOFTWARE_CHANNEL_ID or MOVIE_CHANNEL_ID not set. Skipping membership check."
-        )
-        return True
-    try:
-        soft_id = int(SOFTWARE_CHANNEL_ID)
-        mov_id = int(MOVIE_CHANNEL_ID)
-        # Check membership concurrently
-        results = await asyncio.gather(
-            client.get_chat_member(chat_id=soft_id, user_id=user_id),
-            client.get_chat_member(chat_id=mov_id, user_id=user_id),
-            return_exceptions=True,  # Return exceptions instead of raising them immediately
-        )
-        # Check if any of the calls resulted in an error indicating non-membership
-        for result in results:
-            if isinstance(result, UserNotParticipant):
-                return False
-            elif isinstance(
-                result, (PeerIdInvalid, ChannelInvalid)
-            ):  # Catch ChannelInvalid explicitly too
-                print(
-                    f"Error checking membership for user {user_id}: PEER_ID_INVALID or CHANNEL_INVALID. "
-                    f"Check if Channel IDs ({SOFTWARE_CHANNEL_ID}, {MOVIE_CHANNEL_ID}) are correct numerical IDs "
-                    f"and if the bot is a member/admin in both channels. Specific error: {type(result).__name__}"
-                )
-                return False  # Treat as failure if channel ID is wrong
-            elif isinstance(result, Exception):  # Catch other potential errors
-                print(
-                    f"Unexpected error checking membership for user {user_id}: {type(result).__name__} - {result}"
-                )
-                return False  # Treat other errors as failure
-        return True  # If no exceptions indicating failure occurred
-    except ValueError:
-        print(
-            f"Error: One or both Channel IDs ({SOFTWARE_CHANNEL_ID}, {MOVIE_CHANNEL_ID}) are not valid integers."
-        )
-        return False
-    except Exception as e:
-        print(
-            f"General error during membership check for user {user_id}: {type(e).__name__} - {e}"
-        )
-        return False
-
-
-# --- Buttons ---
-def get_membership_buttons() -> InlineKeyboardMarkup:
-    """Returns buttons for users who haven't joined channels."""
-    buttons = [
-        [
-            InlineKeyboardButton("➡️ Software Channel", url=SOFTWARE_CHANNEL_LINK),
-            InlineKeyboardButton("➡️ Movie Channel", url=MOVIE_CHANNEL_LINK),
-        ],
-        [InlineKeyboardButton("🔄 Retry", callback_data="retry_start")],
-    ]
-    return InlineKeyboardMarkup(buttons)
 
 
 def get_resolution_buttons(message_id: int) -> InlineKeyboardMarkup:

@@ -52,14 +52,3 @@ VIDEO_FORMATS = [
 
 # Add this if it's not already in replies.py
 VIDEO_HEIGHT_TEXT = "Please select your preferred video quality:"
-
-# Membership check failure text
-membership_fail_text = """
-Hello {mention}! 👋
-
-To use me, you need to be a member of our channels:
-- **Software Channel**
-- **Movie Channel**
-
-Please join them using the buttons below and then click 'Retry'.
-"""
