@@ -19,7 +19,6 @@ from .config import (
     active_downloads,
 )
 from .helpers import (
-    get_membership_buttons,
     get_resolution_buttons,
     create_progress_bar,
     edit_status_message,

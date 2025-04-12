@@ -3,7 +3,7 @@ import time
 import asyncio
 from pyrogram import Client
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from pyrogram.errors import UserNotParticipant, PeerIdInvalid, FloodWait, ChannelInvalid
+from pyrogram.errors import FloodWait
 from .config import (
     PROGRESS_BAR_LENGTH,
     last_update_time,
