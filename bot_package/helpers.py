@@ -9,6 +9,10 @@ from .config import (
     last_update_time,
     UPDATE_INTERVAL,
 )
+from pymongo import MongoClient;
+from dotenv import load_dotenv
+load_dotenv()
+import pprint
 
 # --- Progress Bar ---
 def create_progress_bar(percentage: float, length: int = PROGRESS_BAR_LENGTH) -> str:
@@ -82,3 +86,117 @@ def get_user_download_path(user_id: int) -> str:
     user_download_dir = os.path.join(BASE_DOWNLOAD_PATH, str(user_id))
     os.makedirs(user_download_dir, exist_ok=True)
     return user_download_dir
+
+
+# --- MongoDB Connection ---
+
+pwd = os.getenv('MONGO_PWD')
+
+# connection string
+connection_string = f'mongodb+srv://myAtlasDBUser:{pwd}@pyroytbot.p1vptc2.mongodb.net/?retryWrites=true&w=majority&appName=PyroYtBot'
+
+# initialize the client
+client = MongoClient(connection_string)
+
+
+# create a document inside a collection
+def create_user_document_in_mongodb(info: dict) -> str:
+    """Inserts a single document into the MongoDB collection.
+        - Args:
+        info (dict): The document to insert.
+        - Returns:
+        bool: True if the document was inserted successfully, False otherwise.
+        - Raises:
+        Exception: If there is an error during the insertion process.
+    """
+    try:
+        bot_db = client.bot_db
+        bot_collection = bot_db.bot_collection
+        bot_collection.insert_one(info)
+        return "True"
+    except Exception as e:
+        print(f"Error inserting document: {e}")
+        return "False"
+
+
+
+def find_user_by_id_in_mongodb (id: str) -> str:
+    """Finds a user by ID in the MongoDB collection.
+    - Args:
+        id (str): The ID of the user to find.
+    - Returns:
+        dict: The user document if found, None otherwise.
+    """
+    id = str(id)
+    try:
+        find_user = client.bot_db.bot_collection.find_one({"_id": id})
+        if find_user is None:
+            print(f"User with ID: {id} not found")
+            return "False"
+        else:
+            return "True"            
+    except Exception as e:
+        return "False"
+
+def add_a_sudo_user_to_the_db(info: dict) -> str:
+    """Adds a sudo user to the MongoDB collection.
+    - Args:
+        info (dict): The document to insert.
+    - Returns:
+        bool: True if the document was inserted successfully, False otherwise.
+    """
+    try:
+        sudo_db = client.sudo_db
+        bot_collection = sudo_db.sudo_users
+        bot_collection.insert_one(info)
+        return "True"
+    except Exception as e:
+        print(f"Error inserting document: {e}")
+        return "False"
+    
+def find_sudo_user_by_id(id: str) -> str:
+    """Finds a sudo user by ID in the MongoDB collection.
+    - Args:
+        id (str): The ID of the user to find.
+    - Returns:
+        dict: The user document if found, None otherwise.
+    """
+    id = str(id)
+    try:
+        find_user = client.sudo_db.sudo_users.find_one({"_id": id})
+        if find_user is None:
+            print(f"User with ID: {id} not found")
+            return "False"
+        else:
+            return "True"            
+    except Exception as e:
+        return "False"
+    
+def remove_a_sudo_user_from_the_db(id: str) -> str:
+    """Removes a sudo user from the MongoDB collection.
+    - Args:
+        id (str): The ID of the user to remove.
+    - Returns:
+        bool: True if the document was removed successfully, False otherwise.
+    """
+    id = str(id)
+    try:
+        sudo_db = client.sudo_db
+        bot_collection = sudo_db.sudo_users
+        result = bot_collection.delete_one({"_id": id})
+        if result.deleted_count > 0:
+            return "True"
+        else:
+            return "False"
+    except Exception as e:
+        print(f"Error removing document: {e}")
+        return "False"
+    
+# counting all documents in a database
+def count_sudo_users() -> str:
+    count = client.sudo_db.sudo_users.count_documents(filter={})
+    return str(count)
+
+def count_bot_users() -> str:
+    count = client.bot_db.bot_collection.count_documents(filter={})
+    return str(count)
