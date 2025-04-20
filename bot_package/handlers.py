@@ -394,6 +394,7 @@ async def remove_sudo_user(client: Client, message):
 
 
 # ---- List sudo users --------#
+
 @bot.on_message(filters.command("allsudo"))
 async def list_sudo_users(client: Client, message):
     user_id = str(message.from_user.id)
@@ -405,16 +406,20 @@ async def list_sudo_users(client: Client, message):
     checking = await message.reply("Checking sudo users...")
     sudo_users_count = count_sudo_users()
     if sudo_users_count is not None:
-        await message.delete()
+        # await message.delete()
         await checking.edit(f"""
 __**Sudo User Status**__:
 There are ({sudo_users_count}) sudo users.
 """)
     else:
-        await message.delete()
-        await checking.delete()
+        await message.reply("Error counting sudo users.")
+        return
+        # await message.delete()
+        # await checking.delete()
+    
     
 ### -------- List bot users -----
+
 @bot.on_message(filters.command("allusers"))
 async def list_users(client: Client, message):
     user_id = str(message.from_user.id)
@@ -432,8 +437,10 @@ __**User Status**__:
 There are ({user_count}) users.
 """)
     else:
-        await message.delete()
-        await checking.delete()
+        await message.reply("Error counting users.")
+        return
+        # await message.delete()
+        # await checking.delete()
     
 
 
