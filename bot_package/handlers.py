@@ -48,54 +48,54 @@ async def mongo_check_user_database(
     if not find_user_by_id_in_mongodb(userid):
         # If user not found, create a new document in MongoDB for the user
         info: dict = {
-            "_id": str(userdict.id),
-            "date_time": message.date,
-            "fist_name": userdict.first_name,
-            "last_name": userdict.last_name,
-            "username": userdict.username,
-            "language_code": userdict.language_code,
-            "Dc_id": userdict.dc_id,
-            "is_premium": userdict.is_premium,
-            "is_verified": userdict.is_verified,
-            "message_body": message.text,
-            "message_id": message.id,
-            "chat_id": message.chat.id,
-            "chat_title": message.chat.title,
-            "chat_type": str(message.chat.type),
-            "chat_username": message.chat.username,
+            "_id": str(userdict.id) or "None",
+            "date_time": message.date or "None",
+            "fist_name": userdict.first_name or "None",
+            "last_name": userdict.last_name or "None",
+            "username": userdict.username or "None",
+            "language_code": userdict.language_code or "None",
+            "Dc_id": userdict.dc_id or "None",
+            "is_premium": userdict.is_premium or "None",
+            "is_verified": userdict.is_verified or "None",
+            "message_body": message.text or "None",
+            "message_id": message.id or "None",
+            "chat_id": message.chat.id or "None",
+            "chat_title": message.chat.title or "None",
+            "chat_type": str(message.chat.type) or "None",
+            "chat_username": message.chat.username or "None",
         }
 
         await create_user_document_in_mongodb(info)
-        return True
-    return False
+        return "True"
+    return "False"
 
 
 async def mongo_check_sudo_database(
-    userid: str = "", userdict=None, message=None
+    userid: str, userdict: dict=None, message=None
 ) -> bool:
     if not await find_sudo_user_by_id(userid):
         # If user not found, create a new document in MongoDB for the user
         info: dict = {
-            "_id": str(userdict.id),
-            "date_time": message.date,
-            "fist_name": userdict.first_name,
-            "last_name": userdict.last_name,
-            "username": userdict.username,
-            "language_code": userdict.language_code,
-            "Dc_id": userdict.dc_id,
-            "is_premium": userdict.is_premium,
-            "is_verified": userdict.is_verified,
-            "message_body": message.text,
-            "message_id": message.id,
-            "chat_id": message.chat.id,
-            "chat_title": message.chat.title,
-            "chat_type": str(message.chat.type),
-            "chat_username": message.chat.username,
-        }
+            "_id": str(userdict.id) or "None",
+            "date_time": message.date or "None",
+            "fist_name": userdict.first_name or "None",
+            "last_name": userdict.last_name or "None",
+            "username": userdict.username or "None",
+            "language_code": userdict.language_code or "None",
+            "Dc_id": userdict.dc_id or "None",
+            "is_premium": userdict.is_premium or "None",
+            "is_verified": userdict.is_verified or "None",
+            "message_body": message.text or "None",
+            "message_id": message.id or "None",
+            "chat_id": message.chat.id or "None",
+            "chat_title": message.chat.title or "None",
+            "chat_type": str(message.chat.type) or "None",
+            "chat_username": message.chat.username or "None"
+            }
 
         await add_a_sudo_user_to_the_db(info)
-        return True
-    return False
+        return "True"
+    return "False"
 
 
 # --- Command Handlers ---
