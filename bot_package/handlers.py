@@ -424,7 +424,7 @@ async def remove_sudo_user(client: Client, message):
 async def list_sudo_users(client: Client, message):
     user_id = str(message.from_user.id)
     if (
-        message.from_user.id not in AUTH_USERS
+        user_id not in AUTH_USERS
         and find_sudo_user_by_id(user_id) == "False"
     ):
         not_authorized = await message.reply(
@@ -452,12 +452,11 @@ There are ({sudo_users_count}) sudo users.
 
 ### -------- List bot users -----
 
-
 @bot.on_message(filters.command("allusers"))
 async def list_users(client: Client, message):
     user_id = str(message.from_user.id)
     if (
-        message.from_user.id not in AUTH_USERS
+        user_id not in AUTH_USERS
         and find_user_by_id_in_mongodb(user_id) == "False"
     ):
         not_authorized = await message.reply(
