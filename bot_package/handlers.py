@@ -4,6 +4,7 @@ import asyncio
 import time
 import shutil
 import re
+from pymongo import MongoClient
 from pyrogram import Client, filters
 from pyrogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from pyrogram.errors import FloodWait, PeerIdInvalid
@@ -39,6 +40,15 @@ from buttons import (
     ABOUT_BUTTON,
     DL_COMPLETE_BUTTON,
 )  # Assuming buttons.py exists
+
+# --- MongoDB Connection ---
+pwd = os.getenv('MONGO_PWD')
+
+# connection string
+connection_string = f'mongodb+srv://myAtlasDBUser:{pwd}@pyroytbot.p1vptc2.mongodb.net/?retryWrites=true&w=majority&appName=PyroYtBot'
+
+# initialize the client
+client = MongoClient(connection_string)
 
 
 # --- MongoDB tools ---
