@@ -30,7 +30,7 @@ from .helpers import (
     find_user_by_id_in_mongodb,
     add_a_sudo_user_to_the_db,
     find_sudo_user_by_id,
-    remove_a_sudo_user_from_the_db
+    remove_a_sudo_user_from_the_db,
 )
 from .downloader import get_video_info, download_video_async
 from replies import *  # Assuming replies.py exists and contains text variables
@@ -42,56 +42,64 @@ from buttons import (
 
 
 # --- MongoDB tools ---
-async def mongo_check_user_database(userid: str = "", userdict=None, message=None) -> bool:
+async def mongo_check_user_database(
+    userid: str = "", userdict=None, message=None
+) -> bool:
     if not find_user_by_id_in_mongodb(userid):
         # If user not found, create a new document in MongoDB for the user
-        info: dict = {"_id": str(userdict.id),
-                      "date_time": message.date,
-                      "fist_name": userdict.first_name, 
-                      "last_name": userdict.last_name,
-                      "username": userdict.username,
-                      "language_code": userdict.language_code,
-                      "Dc_id": userdict.dc_id,
-                      "is_premium": userdict.is_premium,
-                      "is_verified": userdict.is_verified,
-                      "message_body": message.text,
-                      "message_id": message.id,
-                      "chat_id": message.chat.id,
-                      "chat_title": message.chat.title,
-                      "chat_type": str(message.chat.type),
-                      "chat_username": message.chat.username}
+        info: dict = {
+            "_id": str(userdict.id),
+            "date_time": message.date,
+            "fist_name": userdict.first_name,
+            "last_name": userdict.last_name,
+            "username": userdict.username,
+            "language_code": userdict.language_code,
+            "Dc_id": userdict.dc_id,
+            "is_premium": userdict.is_premium,
+            "is_verified": userdict.is_verified,
+            "message_body": message.text,
+            "message_id": message.id,
+            "chat_id": message.chat.id,
+            "chat_title": message.chat.title,
+            "chat_type": str(message.chat.type),
+            "chat_username": message.chat.username,
+        }
 
         await create_user_document_in_mongodb(info)
         return True
     return False
 
-async def mongo_check_sudo_database(userid: str = "", userdict=None, message=None) -> bool:
+
+async def mongo_check_sudo_database(
+    userid: str = "", userdict=None, message=None
+) -> bool:
     if not await find_sudo_user_by_id(userid):
         # If user not found, create a new document in MongoDB for the user
-        info: dict = {"_id": str(userdict.id),
-                      "date_time": message.date,
-                      "fist_name": userdict.first_name, 
-                      "last_name": userdict.last_name,
-                      "username": userdict.username,
-                      "language_code": userdict.language_code,
-                      "Dc_id": userdict.dc_id,
-                      "is_premium": userdict.is_premium,
-                      "is_verified": userdict.is_verified,
-                      "message_body": message.text,
-                      "message_id": message.id,
-                      "chat_id": message.chat.id,
-                      "chat_title": message.chat.title,
-                      "chat_type": str(message.chat.type),
-                      "chat_username": message.chat.username}
+        info: dict = {
+            "_id": str(userdict.id),
+            "date_time": message.date,
+            "fist_name": userdict.first_name,
+            "last_name": userdict.last_name,
+            "username": userdict.username,
+            "language_code": userdict.language_code,
+            "Dc_id": userdict.dc_id,
+            "is_premium": userdict.is_premium,
+            "is_verified": userdict.is_verified,
+            "message_body": message.text,
+            "message_id": message.id,
+            "chat_id": message.chat.id,
+            "chat_title": message.chat.title,
+            "chat_type": str(message.chat.type),
+            "chat_username": message.chat.username,
+        }
 
         await add_a_sudo_user_to_the_db(info)
         return True
     return False
 
 
-
-
 # --- Command Handlers ---
+
 
 @bot.on_message(filters.command("start"))
 async def start_command(client: Client, message):
@@ -122,7 +130,7 @@ async def about_command(client: Client, message):
     user_id = str(message.from_user.id)
     userdict: dict = message.from_user
     mongo_check_user_database(str(user_id), userdict, message)
-    
+
     await message.reply(
         text="**💁 Some details about Me 💁**",
         reply_markup=InlineKeyboardMarkup(ABOUT_BUTTON),
@@ -162,7 +170,9 @@ async def clean_directory(client: Client, message):
                     print(f"Failed to delete {file_path}. Reason: {e}")
                     errors.append(f"Could not delete '{filename}': {e}")
 
-            result_message = f"**__Cleanup complete.__**\n\n✅ Deleted {deleted_count} items."
+            result_message = (
+                f"**__Cleanup complete.__**\n\n✅ Deleted {deleted_count} items."
+            )
             if errors:
                 result_message += "\n\n⚠️ **Errors encountered:**\n" + "\n".join(errors)
             await deleting_msg.edit(result_message)
@@ -231,7 +241,6 @@ async def restart_command(client: Client, message):
     print("Scheduled restart task. Handler finishing.")
 
 
-
 # --- URL Handler ---
 
 
@@ -240,7 +249,6 @@ async def restart_command(client: Client, message):
         r"(https?://)?(www\.)?(youtube\.com|youtu\.?be)/.+(watch\?v=|embed/|v/|.+\?v=)?([^&\n]{11})",
         re.IGNORECASE,
     )
-
 )
 async def youtube_url_handler(client: Client, message):
     user_id = str(message.from_user.id)
@@ -300,58 +308,67 @@ async def add_sudo_user(client: Client, message):
     check_db_for_sudo_user = find_sudo_user_by_id(user_id)
     message_text: str = str(message.text).strip()
     if user_id not in AUTH_USERS and check_db_for_sudo_user == "False":
-        not_authorized = await message.reply("⛔ You are not authorized to use this command.")
+        not_authorized = await message.reply(
+            "⛔ You are not authorized to use this command."
+        )
         await asyncio.sleep(5)
         await not_authorized.delete()
         await message.delete()
 
-    if (message.reply_to_message
-        and find_sudo_user_by_id(str(message.reply_to_message.from_user.id)) == "False"):
+    if (
+        message.reply_to_message
+        and find_sudo_user_by_id(str(message.reply_to_message.from_user.id)) == "False"
+    ):
         user_to_add_info: dict = message.reply_to_message.from_user
-        info: dict = {"_id": str(user_to_add_info.id),
-                      "date_time": message.reply_to_message.date,
-                      "fist_name": user_to_add_info.first_name, 
-                      "last_name": user_to_add_info.last_name,
-                      "username": user_to_add_info.username,
-                      "language_code": user_to_add_info.language_code,
-                      "Dc_id": user_to_add_info.dc_id,
-                      "is_premium": user_to_add_info.is_premium,
-                      "is_verified": user_to_add_info.is_verified,
-                      "message_body": message.reply_to_message.text,
-                      "message_id": message.reply_to_message.id,
-                      "chat_id": message.chat.id,
-                      "chat_title": message.chat.title,
-                      "chat_type": str(message.chat.type),
-                      "chat_username": message.chat.username}
+        info: dict = {
+            "_id": str(user_to_add_info.id),
+            "date_time": message.reply_to_message.date,
+            "fist_name": user_to_add_info.first_name,
+            "last_name": user_to_add_info.last_name,
+            "username": user_to_add_info.username,
+            "language_code": user_to_add_info.language_code,
+            "Dc_id": user_to_add_info.dc_id,
+            "is_premium": user_to_add_info.is_premium,
+            "is_verified": user_to_add_info.is_verified,
+            "message_body": message.reply_to_message.text,
+            "message_id": message.reply_to_message.id,
+            "chat_id": message.chat.id,
+            "chat_title": message.chat.title,
+            "chat_type": str(message.chat.type),
+            "chat_username": message.chat.username,
+        }
         add_a_sudo_user_to_the_db(info)
         await bot.send_message(f"{user_to_add_info.id} added as a Sudo user")
         await message.delete()
         return
-    elif (message.reply_to_message 
-          and find_sudo_user_by_id(str(message.reply_to_message.from_user.id)) == "True"):
+    elif (
+        message.reply_to_message
+        and find_sudo_user_by_id(str(message.reply_to_message.from_user.id)) == "True"
+    ):
         await message.reply("User already added.")
         return
-        
-    if (not message.reply_to_message
+
+    if (
+        not message.reply_to_message
         and len(message.text.split(" ")) == 2
-        and find_sudo_user_by_id(str(message.text.split(" ")[1].strip())) == "False"):
+        and find_sudo_user_by_id(str(message.text.split(" ")[1].strip())) == "False"
+    ):
         sudo_user_id: str = str(message_text).split(" ")[1]
         user_info = await bot.get_chat(sudo_user_id)
-        info: dict = {"_id": sudo_user_id,
-                      "date_time": message.date,
-                      "fist_name": user_info.first_name,
-                      "last_name": user_info.last_name,
-                      "username": user_info.username
-                    }
+        info: dict = {
+            "_id": sudo_user_id,
+            "date_time": message.date,
+            "fist_name": user_info.first_name,
+            "last_name": user_info.last_name,
+            "username": user_info.username,
+        }
         add_a_sudo_user_to_the_db(info)
         await message.reply(f"{user_info.first_name} added as a Sudo user")
         return
-    elif (not message.reply_to_message
-          and len(message.text.split(" ")) == 1):
+    elif not message.reply_to_message and len(message.text.split(" ")) == 1:
         await message.reply("Please provide a user ID.")
     else:
         await message.reply("User already added.")
-        
 
 
 ##### remove sudo user ########
@@ -361,33 +378,40 @@ async def remove_sudo_user(client: Client, message):
     check_db_for_sudo_user = find_sudo_user_by_id(user_id)
     message_text: str = str(message.text).strip()
     if user_id not in AUTH_USERS and check_db_for_sudo_user == "False":
-        not_authorized = await message.reply("⛔ You are not authorized to use this command.")
+        not_authorized = await message.reply(
+            "⛔ You are not authorized to use this command."
+        )
         await asyncio.sleep(5)
         await not_authorized.delete()
         await message.delete()
 
-    if (message.reply_to_message
-        and find_sudo_user_by_id(str(message.reply_to_message.from_user.id)) == "True"):
+    if (
+        message.reply_to_message
+        and find_sudo_user_by_id(str(message.reply_to_message.from_user.id)) == "True"
+    ):
         user_to_remove_info: dict = message.reply_to_message.from_user
         remove_a_sudo_user_from_the_db(user_to_remove_info.id)
         await bot.send_message(f"{user_to_remove_info.id} removed from Sudo users")
         await message.delete()
         return
-    elif (message.reply_to_message 
-          and find_sudo_user_by_id(str(message.reply_to_message.from_user.id)) == "False"):
+    elif (
+        message.reply_to_message
+        and find_sudo_user_by_id(str(message.reply_to_message.from_user.id)) == "False"
+    ):
         await message.reply("User already removed.")
         return
-        
-    if (not message.reply_to_message
+
+    if (
+        not message.reply_to_message
         and len(message.text.split(" ")) == 2
-        and find_sudo_user_by_id(str(message.text.split(" ")[1].strip())) == "True"):
+        and find_sudo_user_by_id(str(message.text.split(" ")[1].strip())) == "True"
+    ):
         sudo_user_id: str = str(message_text).split(" ")[1]
         user_info = await bot.get_chat(sudo_user_id)
         remove_a_sudo_user_from_the_db(sudo_user_id)
         await message.reply(f"{user_info.first_name} removed from Sudo users")
         return
-    elif (not message.reply_to_message
-          and len(message.text.split(" ")) == 1):
+    elif not message.reply_to_message and len(message.text.split(" ")) == 1:
         await message.reply("Please provide a user ID.")
     else:
         await message.reply("User already removed.")
@@ -395,53 +419,68 @@ async def remove_sudo_user(client: Client, message):
 
 # ---- List sudo users --------#
 
+
 @bot.on_message(filters.command("allsudo"))
 async def list_sudo_users(client: Client, message):
     user_id = str(message.from_user.id)
-    if message.from_user.id not in AUTH_USERS and find_sudo_user_by_id(user_id) == "False":
-        not_authorized = await message.reply("You are not authorized to use this command")
-        await message.delete()
-        await not_authorized.delete()
+    if (
+        message.from_user.id not in AUTH_USERS
+        and find_sudo_user_by_id(user_id) == "False"
+    ):
+        not_authorized = await message.reply(
+            "You are not authorized to use this command"
+        )
+        # await message.delete()
+        # await not_authorized.delete()
         return
     checking = await message.reply("Checking sudo users...")
     sudo_users_count = count_sudo_users()
     if sudo_users_count is not None:
         # await message.delete()
-        await checking.edit(f"""
+        await checking.edit(
+            f"""
 __**Sudo User Status**__:
 There are ({sudo_users_count}) sudo users.
-""")
+"""
+        )
     else:
         await message.reply("Error counting sudo users.")
-        return
-        # await message.delete()
-        # await checking.delete()
-    
-    
+        # return
+        await message.delete()
+        await checking.delete()
+
+
 ### -------- List bot users -----
+
 
 @bot.on_message(filters.command("allusers"))
 async def list_users(client: Client, message):
     user_id = str(message.from_user.id)
-    if message.from_user.id not in AUTH_USERS and find_user_by_id_in_mongodb(user_id) == "False":
-        not_authorized = await message.reply("You are not authorized to use this command")
-        await message.delete()
-        await not_authorized.delete()
+    if (
+        message.from_user.id not in AUTH_USERS
+        and find_user_by_id_in_mongodb(user_id) == "False"
+    ):
+        not_authorized = await message.reply(
+            "You are not authorized to use this command"
+        )
+        # await message.delete()
+        # await not_authorized.delete()
         return
     checking = await message.reply("Checking users...")
     user_count = count_bot_users()
     if user_count is not None:
         await message.delete()
-        await checking.edit(f"""
+        await checking.edit(
+            f"""
 __**User Status**__:
 There are ({user_count}) users.
-""")
+"""
+        )
     else:
         await message.reply("Error counting users.")
-        return
-        # await message.delete()
-        # await checking.delete()
-    
+        # return
+        await message.delete()
+        await checking.delete()
 
 
 # --- Callback Query Handler ---
@@ -457,7 +496,6 @@ async def handle_callback_query(client: Client, callbackQuery: CallbackQuery):
     original_msg_id = 0  # Initialize outside try block
     status_msg = None  # Initialize outside try block
     chat_id = message.chat.id if message else None  # Initialize chat_id
-
 
     # --- Cancel Logic (Handles cancellation from resolution buttons AND status message) ---
     if data.startswith("cancel:"):
