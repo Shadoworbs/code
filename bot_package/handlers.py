@@ -134,7 +134,7 @@ async def about_command(client: Client, message):
 async def clean_directory(client: Client, message):
     user_id = str(message.from_user.id)
     userdict: dict = message.from_user
-    mongo_check_user_database(str(user_id), userdict, message)
+    await mongo_check_user_database(str(user_id), userdict, message)
 
     user_download_dir = get_user_download_path(user_id)  # Use helper
     deleting_msg = await message.reply(
