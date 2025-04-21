@@ -246,6 +246,7 @@ async def download_thumbnail_async(url: str = None, local_path: str = None, user
                 if response.status == 200:
                     with open(local_path, "wb") as file:
                         file.write(await response.read())
+                    print(f"Thumbnail downloaded successfully: {local_path}")
                     return (True, local_path)
                 else:
                     print(f"Failed to download thumbnail. Status code: {response.status}")
