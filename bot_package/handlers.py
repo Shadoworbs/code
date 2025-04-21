@@ -20,6 +20,7 @@ from .config import (
     active_downloads,
 )
 from .helpers import (
+    convert_thumbnail_to_jpeg,
     count_bot_users,
     count_sudo_users,
     download_thumbnail_async,
@@ -693,9 +694,18 @@ async def handle_callback_query(client: Client, callbackQuery: CallbackQuery):
             )
 
             title, thumbnail_url = await get_video_info(url)  # Get thumbnail URL again
-            print("checking thumbnail status")
+            print("Checking thumbnail status...")
             thumbnail_status, thumbnail = await download_thumbnail_async(url=thumbnail_url, local_path=f"{filepath}.jpg", user_id=user_id)
+            
+            if not thumbnail_status:
+                pass
+            else:
+                print("Please wait. Converting thumbnail...")
+                convert_thumbnail_to_jpeg(thumbnail, thumbnail)
 
+            # await asyncio.sleep(3)
+
+            print("Uploading...")
             send = await client.send_video(
                 chat_id=chat_id,
                 video=filepath,

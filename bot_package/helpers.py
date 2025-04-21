@@ -238,7 +238,7 @@ async def download_thumbnail_async(url: str = None, local_path: str = None, user
         if not os.path.exists(work_dir):
             os.makedirs(work_dir, exist_ok=True)
         os.chdir(work_dir)  # Change to the user's download directory
-        local_path = os.path.join(work_dir, local_path)
+        local_path = os.path.join(work_dir, local_path.replace(" ", "_"))
     except Exception as e:
         print(f"Error creating directory: {e}")
         pass
@@ -257,3 +257,16 @@ async def download_thumbnail_async(url: str = None, local_path: str = None, user
     except Exception as e:
         print(f"Error downloading thumbnail: {e}")
         return (False, None)
+
+
+# convert the downloaded thumbnail to a Jpeg image with width and height not more than 320px320px using ffmpeg
+def convert_thumbnail_to_jpeg(input_path: str, output_path: str) -> bool:
+    """Converts a thumbnail to JPEG format with a maximum size of 320x320."""
+    try:
+        # Use ffmpeg to convert and resize the image
+        os.system(f"ffmpeg -i {input_path} -vf scale=320:320 -q:v 2 {output_path} -y")
+        print(f"Thumbnail converted successfully: {output_path}")
+        return True
+    except Exception as e:
+        print(f"Error converting thumbnail: {e}")
+        return False
