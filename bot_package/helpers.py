@@ -1,3 +1,4 @@
+import aiohttp
 import os
 import time
 import asyncio
@@ -226,3 +227,29 @@ def list_all_sudo_users() -> list:
     except Exception as e:
         print(f"Error listing sudo users: {e}")
         return f"Error listing sudo user names: {e}"
+
+
+# download thumbnail form a url and save it to a local path using requests asyncio
+
+async def download_thumbnail_async(url: str = None, local_path: str = None, user_id: str = None) -> tuple:
+    """Downloads a thumbnail from a URL and saves it to a local path."""
+    user_id = str(user_id)
+    try:
+        # Ensure the directory exists
+        # if not os.path.exists(os.path.join("downloads", user_id)):
+        #     os.makedirs(os.path.join("downloads", user_id))
+        # os.chdir(os.path.join("downloads", user_id))
+        # # Create the local path
+        # local_path = os.path.join("downloads", user_id, local_path)
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                if response.status == 200:
+                    with open(local_path, "wb") as file:
+                        file.write(await response.read())
+                    return (True, local_path)
+                else:
+                    print(f"Failed to download thumbnail. Status code: {response.status}")
+                    return (False, None)
+    except Exception as e:
+        print(f"Error downloading thumbnail: {e}")
+        return (False, None)

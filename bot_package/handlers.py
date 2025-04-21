@@ -22,6 +22,7 @@ from .config import (
 from .helpers import (
     count_bot_users,
     count_sudo_users,
+    download_thumbnail_async,
     get_resolution_buttons,
     create_progress_bar,
     edit_status_message,
@@ -691,11 +692,13 @@ async def handle_callback_query(client: Client, callbackQuery: CallbackQuery):
                 reply_markup=cancel_button_markup,  # Ensure cancel button is present at start of upload
             )
 
-            _, thumbnail_url = await get_video_info(url)  # Get thumbnail URL again
+            title, thumbnail_url = await get_video_info(url)  # Get thumbnail URL again
+            _, thumbnail = await download_thumbnail_async(url=thumbnail_url, local_path=f"{title}.jpg", user_id=user_id)
+
             send = await client.send_video(
                 chat_id=chat_id,
                 video=filepath,
-                thumb=thumbnail_url,  # Use thumbnail URL if available
+                thumb=thumbnail,  # Use thumbnail if available
                 reply_markup=InlineKeyboardMarkup(
                     DL_COMPLETE_BUTTON
                 ),  # Final message buttons
