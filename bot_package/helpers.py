@@ -2,6 +2,7 @@ import aiohttp
 import os
 import time
 import asyncio
+from arrow import get
 from pyrogram import Client
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from pyrogram.errors import FloodWait
@@ -235,12 +236,16 @@ async def download_thumbnail_async(url: str = None, local_path: str = None, user
     """Downloads a thumbnail from a URL and saves it to a local path."""
     user_id = str(user_id)
     try:
-        # Ensure the directory exists
-        # if not os.path.exists(os.path.join("downloads", user_id)):
-        #     os.makedirs(os.path.join("downloads", user_id))
-        # os.chdir(os.path.join("downloads", user_id))
-        # # Create the local path
-        # local_path = os.path.join("downloads", user_id, local_path)
+        work_dir = get_user_download_path(user_id)
+        if not os.path.exists(work_dir):
+            os.makedirs(work_dir, exist_ok=True)
+        os.chdir(work_dir)  # Change to the user's download directory
+        local_path = os.path.join(work_dir, local_path)
+    except Exception as e:
+        print(f"Error creating directory: {e}")
+        pass
+
+    try:
         async with aiohttp.ClientSession() as session:
             async with session.get(url) as response:
                 if response.status == 200:

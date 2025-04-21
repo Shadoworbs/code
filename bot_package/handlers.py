@@ -694,7 +694,7 @@ async def handle_callback_query(client: Client, callbackQuery: CallbackQuery):
 
             title, thumbnail_url = await get_video_info(url)  # Get thumbnail URL again
             print("checking thumbnail status")
-            thumbnail_status, thumbnail = await download_thumbnail_async(url=thumbnail_url, local_path=f"{title}.jpg", user_id=user_id)
+            thumbnail_status, thumbnail = await download_thumbnail_async(url=thumbnail_url, local_path=f"{filepath}.jpg", user_id=user_id)
 
             send = await client.send_video(
                 chat_id=chat_id,
