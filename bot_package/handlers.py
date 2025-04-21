@@ -41,15 +41,6 @@ from buttons import (
     DL_COMPLETE_BUTTON,
 )  # Assuming buttons.py exists
 
-# --- MongoDB Connection ---
-pwd = os.getenv('MONGO_PWD')
-
-# connection string
-connection_string = f'mongodb+srv://myAtlasDBUser:{pwd}@pyroytbot.p1vptc2.mongodb.net/?retryWrites=true&w=majority&appName=PyroYtBot'
-
-# initialize the client
-client = MongoClient(connection_string)
-
 
 # --- MongoDB tools ---
 async def mongo_check_user_database(
@@ -126,7 +117,6 @@ async def start_command(client: Client, message):
 
 @bot.on_message(filters.command("help"))
 async def help_command(client: Client, message):
-    print(f"Help command received from user {message.from_user.id}")
 
     user_id = str(message.from_user.id)
     userdict: dict = message.from_user
@@ -139,7 +129,7 @@ async def help_command(client: Client, message):
 async def about_command(client: Client, message):
     user_id = str(message.from_user.id)
     userdict: dict = message.from_user
-    mongo_check_user_database(str(user_id), userdict, message)
+    await mongo_check_user_database(str(user_id), userdict, message)
 
     await message.reply(
         text="**💁 Some details about Me 💁**",
@@ -312,6 +302,7 @@ async def youtube_url_handler(client: Client, message):
 
 
 ##### Add a sudo user ########
+
 @bot.on_message(filters.command("addsudo"))
 async def add_sudo_user(client: Client, message):
     user_id = str(message.from_user.id)
@@ -331,21 +322,21 @@ async def add_sudo_user(client: Client, message):
     ):
         user_to_add_info: dict = message.reply_to_message.from_user
         info: dict = {
-            "_id": str(user_to_add_info.id),
-            "date_time": message.reply_to_message.date,
-            "fist_name": user_to_add_info.first_name,
-            "last_name": user_to_add_info.last_name,
-            "username": user_to_add_info.username,
-            "language_code": user_to_add_info.language_code,
-            "Dc_id": user_to_add_info.dc_id,
-            "is_premium": user_to_add_info.is_premium,
-            "is_verified": user_to_add_info.is_verified,
-            "message_body": message.reply_to_message.text,
-            "message_id": message.reply_to_message.id,
-            "chat_id": message.chat.id,
-            "chat_title": message.chat.title,
-            "chat_type": str(message.chat.type),
-            "chat_username": message.chat.username,
+            "_id": str(user_to_add_info.id) or "None",
+            "date_time": message.reply_to_message.date or "None",
+            "fist_name": user_to_add_info.first_name or "None",
+            "last_name": user_to_add_info.last_name or "None",
+            "username": user_to_add_info.username or "None",
+            "language_code": user_to_add_info.language_code or "None",
+            "Dc_id": user_to_add_info.dc_id or "None",
+            "is_premium": user_to_add_info.is_premium or "None",
+            "is_verified": user_to_add_info.is_verified or "None",
+            "message_body": message.reply_to_message.text or "None",
+            "message_id": message.reply_to_message.id or "None",
+            "chat_id": message.chat.id or "None",
+            "chat_title": message.chat.title or "None",
+            "chat_type": str(message.chat.type) or "None",
+            "chat_username": message.chat.username or "None",
         }
         add_a_sudo_user_to_the_db(info)
         await bot.send_message(f"{user_to_add_info.id} added as a Sudo user")
@@ -382,6 +373,7 @@ async def add_sudo_user(client: Client, message):
 
 
 ##### remove sudo user ########
+
 @bot.on_message(filters.command("rmsudo"))
 async def remove_sudo_user(client: Client, message):
     user_id = str(message.from_user.id)
@@ -429,7 +421,6 @@ async def remove_sudo_user(client: Client, message):
 
 # ---- List sudo users --------#
 
-
 @bot.on_message(filters.command("allsudo"))
 async def list_sudo_users(client: Client, message):
     user_id = str(message.from_user.id)
@@ -440,13 +431,13 @@ async def list_sudo_users(client: Client, message):
         not_authorized = await message.reply(
             "You are not authorized to use this command"
         )
-        # await message.delete()
-        # await not_authorized.delete()
+        await message.delete()
+        await not_authorized.delete()
         return
     checking = await message.reply("Checking sudo users...")
     sudo_users_count = count_sudo_users()
     if sudo_users_count is not None:
-        # await message.delete()
+        await message.delete()
         await checking.edit(
             f"""
 __**Sudo User Status**__:
@@ -454,10 +445,12 @@ There are ({sudo_users_count}) sudo users.
 """
         )
     else:
-        await message.reply("Error counting sudo users.")
-        # return
+        err = await message.reply("Error counting sudo users.")
         await message.delete()
         await checking.delete()
+        await asyncio.sleep(5)
+        await err.delete()
+        return
 
 
 ### -------- List bot users -----
@@ -472,8 +465,9 @@ async def list_users(client: Client, message):
         not_authorized = await message.reply(
             "You are not authorized to use this command"
         )
-        # await message.delete()
-        # await not_authorized.delete()
+        await message.delete()
+        await asyncio.sleep(5)
+        await not_authorized.delete()
         return
     checking = await message.reply("Checking users...")
     user_count = count_bot_users()
@@ -482,14 +476,15 @@ async def list_users(client: Client, message):
         await checking.edit(
             f"""
 __**User Status**__:
-There are ({user_count}) users.
+There are currently {user_count} users of the bot in the database.
 """
         )
     else:
-        await message.reply("Error counting users.")
-        # return
+        err = await message.reply("Error counting users.")
         await message.delete()
         await checking.delete()
+        await asyncio.sleep(5)
+        await err.delete()
 
 
 # --- Callback Query Handler ---
