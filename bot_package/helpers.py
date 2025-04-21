@@ -200,3 +200,29 @@ def count_sudo_users() -> str:
 def count_bot_users() -> str:
     count = client.bot_db.bot_collection.count_documents(filter={})
     return str(count)
+
+# list all users in the bot database by their first name
+def list_all_users() -> list:
+    """Lists all users in the bot database."""
+    try:
+        bot_db = client.bot_db
+        bot_collection = bot_db.bot_collection
+        users = bot_collection.find({})
+        user_list = [f"{user["fist_name"]} ({user["_id"]})" for user in users]
+        return user_list
+    except Exception as e:
+        print(f"Error listing users: {e}")
+        return f"Error listing user names: {e}"
+    
+# list all sudo users in the bot database by their first name
+def list_all_sudo_users() -> list:
+    """Lists all sudo users in the bot database."""
+    try:
+        sudo_db = client.sudo_db
+        bot_collection = sudo_db.sudo_users
+        users = bot_collection.find({})
+        sudo_list = [user["fist_name"] for user in users]
+        return sudo_list
+    except Exception as e:
+        print(f"Error listing sudo users: {e}")
+        return f"Error listing sudo user names: {e}"

@@ -32,6 +32,8 @@ from .helpers import (
     add_a_sudo_user_to_the_db,
     find_sudo_user_by_id,
     remove_a_sudo_user_from_the_db,
+    list_all_sudo_users,
+    list_all_users
 )
 from .downloader import get_video_info, download_video_async
 from replies import *  # Assuming replies.py exists and contains text variables
@@ -44,12 +46,12 @@ from buttons import (
 
 # --- MongoDB tools ---
 async def mongo_check_user_database(
-    userid: str = "", userdict=None, message=None
+    userid: str, userdict=None, message=None
 ) -> bool:
-    if not find_user_by_id_in_mongodb(userid):
+    if find_user_by_id_in_mongodb(userid) == "False":
         # If user not found, create a new document in MongoDB for the user
         info: dict = {
-            "_id": str(userdict.id) or "None",
+            "_id": str(userdict.id),
             "date_time": message.date or "None",
             "fist_name": userdict.first_name or "None",
             "last_name": userdict.last_name or "None",
@@ -66,7 +68,7 @@ async def mongo_check_user_database(
             "chat_username": message.chat.username or "None",
         }
 
-        await create_user_document_in_mongodb(info)
+        create_user_document_in_mongodb(info)
         return "True"
     return "False"
 
@@ -77,7 +79,7 @@ async def mongo_check_sudo_database(
     if not await find_sudo_user_by_id(userid):
         # If user not found, create a new document in MongoDB for the user
         info: dict = {
-            "_id": str(userdict.id) or "None",
+            "_id": str(userdict.id),
             "date_time": message.date or "None",
             "fist_name": userdict.first_name or "None",
             "last_name": userdict.last_name or "None",
@@ -113,6 +115,7 @@ async def start_command(client: Client, message):
         reply_markup=InlineKeyboardMarkup(START_BUTTON),
         disable_web_page_preview=True,
     )
+
 
 
 @bot.on_message(filters.command("help"))
@@ -421,8 +424,9 @@ async def remove_sudo_user(client: Client, message):
 
 # ---- List sudo users --------#
 
-@bot.on_message(filters.command("allsudo"))
+@bot.on_message(filters.command("sudo"))
 async def list_sudo_users(client: Client, message):
+    sudo_user_names = list_all_sudo_users()
     user_id = str(message.from_user.id)
     if (
         user_id not in AUTH_USERS
@@ -442,6 +446,8 @@ async def list_sudo_users(client: Client, message):
             f"""
 __**Sudo User Status**__:
 There are ({sudo_users_count}) sudo users.
+
+{sudo_user_names}
 """
         )
     else:
@@ -455,8 +461,9 @@ There are ({sudo_users_count}) sudo users.
 
 ### -------- List bot users -----
 
-@bot.on_message(filters.command("allusers"))
+@bot.on_message(filters.command("users"))
 async def list_users(client: Client, message):
+    bot_user_names = list_all_users()
     user_id = str(message.from_user.id)
     if (
         user_id not in AUTH_USERS
@@ -477,6 +484,8 @@ async def list_users(client: Client, message):
             f"""
 __**User Status**__:
 There are currently {user_count} users of the bot in the database.
+
+{bot_user_names}
 """
         )
     else:
