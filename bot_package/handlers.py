@@ -695,15 +695,8 @@ async def handle_callback_query(client: Client, callbackQuery: CallbackQuery):
 
             title, thumbnail_url = await get_video_info(url)  # Get thumbnail URL again
             print("Checking thumbnail status...")
-            thumbnail_status, thumbnail = await download_thumbnail_async(url=thumbnail_url, local_path=f"{filepath}.jpg", user_id=user_id)
-            
-            if not thumbnail_status:
-                pass
-            else:
-                print("Please wait. Converting thumbnail...")
-                convert_thumbnail_to_jpeg(thumbnail, thumbnail)
-
-            # await asyncio.sleep(3)
+            args = (thumbnail_url, f"{filepath}.jpg", user_id)
+            thumbnail = convert_thumbnail_to_jpeg(args)
 
             print("Uploading...")
             send = await client.send_video(

@@ -229,7 +229,6 @@ def list_all_sudo_users() -> list:
 
 
 # download thumbnail form a url and save it to a local path using requests asyncio
-
 async def download_thumbnail_async(url: str = None, local_path: str = None, user_id: str = None) -> tuple:
     """Downloads a thumbnail from a URL and saves it to a local path."""
     user_id = str(user_id)
@@ -242,7 +241,6 @@ async def download_thumbnail_async(url: str = None, local_path: str = None, user
     except Exception as e:
         print(f"Error creating directory: {e}")
         pass
-
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(url) as response:
@@ -260,12 +258,13 @@ async def download_thumbnail_async(url: str = None, local_path: str = None, user
 
 
 # convert the downloaded thumbnail to a Jpeg image with width and height not more than 320px320px using ffmpeg
-def convert_thumbnail_to_jpeg(input_path: str, output_path: str) -> bool:
+def convert_thumbnail_to_jpeg(*args) -> bool:
     """Converts a thumbnail to JPEG format with a maximum size of 320x320."""
+    _, lpath_ = download_thumbnail_async(args[0], args[1], args[2])
     try:
         # Use ffmpeg to convert and resize the image
-        os.system(f"ffmpeg -i {input_path} -vf scale=320:320 -q:v 2 {output_path} -y")
-        print(f"Thumbnail converted successfully: {output_path}")
+        os.system(f"ffmpeg -i {lpath_} -vf scale=320:320 -q:v 2 {lpath_} -y")
+        print(f"Thumbnail converted successfully: {lpath_}")
         return True
     except Exception as e:
         print(f"Error converting thumbnail: {e}")
