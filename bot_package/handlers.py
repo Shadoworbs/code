@@ -691,9 +691,11 @@ async def handle_callback_query(client: Client, callbackQuery: CallbackQuery):
                 reply_markup=cancel_button_markup,  # Ensure cancel button is present at start of upload
             )
 
+            _, thumbnail_url = await get_video_info(url)  # Get thumbnail URL again
             send = await client.send_video(
                 chat_id=chat_id,
                 video=filepath,
+                thumb=thumbnail_url,  # Use thumbnail URL if available
                 reply_markup=InlineKeyboardMarkup(
                     DL_COMPLETE_BUTTON
                 ),  # Final message buttons
@@ -729,7 +731,7 @@ async def handle_callback_query(client: Client, callbackQuery: CallbackQuery):
             # Send info to LINK_LOGS
             if LINK_LOGS:
                 try:
-                    link_log_id = int(LINK_LOGS)  # Ensure it's an int
+                    link_log_id = LINK_LOGS  # Ensure it's an int
                     url_LOG_BUTTON = [[InlineKeyboardButton("URL 🔗", url=url)]]
                     await bot.send_message(
                         link_log_id,
