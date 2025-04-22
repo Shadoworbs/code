@@ -212,7 +212,7 @@ def list_all_users() -> list:
         bot_db = client.bot_db
         bot_collection = bot_db.bot_collection
         users = bot_collection.find({})
-        user_list = [f"{user["fist_name"]} ({user["_id"]})" for user in users]
+        user_list = [f"{user["fist_name"]} `{user["_id"]}`" for user in users]
         return user_list
     except Exception as e:
         print(f"Error listing users: {e}")
@@ -225,7 +225,7 @@ def list_all_sudo_users() -> list:
         sudo_db = client.sudo_db
         bot_collection = sudo_db.sudo_users
         users = bot_collection.find({})
-        sudo_list = [user["fist_name"] for user in users]
+        sudo_list = [f"{user["fist_name"]} `{user["_id"]}`" for user in users]
         return sudo_list
     except Exception as e:
         print(f"Error listing sudo users: {e}")

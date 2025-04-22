@@ -6,6 +6,7 @@ import shutil
 import re
 from pymongo import MongoClient
 from pyrogram import Client, filters
+import pyrogram
 from pyrogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from pyrogram.errors import FloodWait, PeerIdInvalid
 
@@ -56,7 +57,7 @@ async def mongo_check_user_database(
         info: dict = {
             "_id": str(userdict.id),
             "date_time": message.date or "None",
-            "fist_name": userdict.first_name or "None",
+            "first_name": userdict.first_name or "None",
             "last_name": userdict.last_name or "None",
             "username": userdict.username or "None",
             "language_code": userdict.language_code or "None",
@@ -84,7 +85,7 @@ async def mongo_check_sudo_database(
         info: dict = {
             "_id": str(userdict.id),
             "date_time": message.date or "None",
-            "fist_name": userdict.first_name or "None",
+            "first_name": userdict.first_name or "None",
             "last_name": userdict.last_name or "None",
             "username": userdict.username or "None",
             "language_code": userdict.language_code or "None",
@@ -340,7 +341,7 @@ async def add_sudo_user(client: Client, message):
         info: dict = {
             "_id": str(user_to_add_info.id) or "None",
             "date_time": message.reply_to_message.date or "None",
-            "fist_name": user_to_add_info.first_name or "None",
+            "first_name": user_to_add_info.first_name or "None",
             "last_name": user_to_add_info.last_name or "None",
             "username": user_to_add_info.username or "None",
             "language_code": user_to_add_info.language_code or "None",
@@ -373,11 +374,15 @@ async def add_sudo_user(client: Client, message):
         sudo_user_id: str = str(message_text).split(" ")[1]
         user_info = await bot.get_chat(sudo_user_id)
         info: dict = {
-            "_id": sudo_user_id,
-            "date_time": message.date,
-            "fist_name": user_info.first_name,
-            "last_name": user_info.last_name,
-            "username": user_info.username,
+            "_id": sudo_user_id or "None",
+            "date_time": message.date or "None",
+            "first_name": user_info.first_name or "None",
+            "last_name": user_info.last_name or "None",
+            "username": user_info.username or "None",
+            "language_code": user_info.language_code or "None",
+            "Dc_id": user_info.dc_id or "None",
+            "is_premium": user_info.is_premium or "None",
+            "is_verified": user_info.is_verified or "None",
         }
         add_a_sudo_user_to_the_db(info)
         await message.reply(f"{user_info.first_name} added as a Sudo user")
@@ -440,6 +445,7 @@ async def remove_sudo_user(client: Client, message):
 @bot.on_message(filters.command("sudo"))
 async def list_sudo_users(client: Client, message):
     sudo_user_names = list_all_sudo_users()
+    enumerated_sudo_user_names = []
     user_id = str(message.from_user.id)
     if (
         user_id not in AUTH_USERS
@@ -448,20 +454,19 @@ async def list_sudo_users(client: Client, message):
         not_authorized = await message.reply(
             "You are not authorized to use this command"
         )
+        await asyncio.sleep(5)
         await message.delete()
         await not_authorized.delete()
         return
     checking = await message.reply("Checking sudo users...")
     sudo_users_count = count_sudo_users()
-    if sudo_users_count is not None:
+    if sudo_users_count != 0:
+        # print all the elements in the list with a prefix starting with 1
+        for i in range(len(sudo_user_names)):
+            enumerated_sudo_user_names.append(f"{i+1}: {sudo_user_names[i]}\n")
         await message.delete()
         await checking.edit(
-            f"""
-__**Sudo User Status**__:
-There are ({sudo_users_count}) sudo users.
-
-{sudo_user_names}
-"""
+            f"**__Total Sudo Users:__** `{sudo_users_count}`\n\n" + "\n".join(sudo_user_names)
         )
     else:
         err = await message.reply("Error counting sudo users.")
@@ -477,6 +482,7 @@ There are ({sudo_users_count}) sudo users.
 @bot.on_message(filters.command("users"))
 async def list_users(client: Client, message):
     bot_user_names = list_all_users()
+    enumerated_bot_user_names = []
     user_id = str(message.from_user.id)
     if (
         user_id not in AUTH_USERS
@@ -489,24 +495,44 @@ async def list_users(client: Client, message):
         await asyncio.sleep(5)
         await not_authorized.delete()
         return
-    checking = await message.reply("Checking users...")
+    checking = await message.reply("Checking database...")
     user_count = count_bot_users()
-    if user_count is not None:
-        await message.delete()
-        await checking.edit(
-            f"""
-__**User Status**__:
-There are currently {user_count} users of the bot in the database.
+    if user_count != 0:
+        # print all the elements in the list with a prefix starting with 1
+        for i in range(len(bot_user_names)):
+            enumerated_bot_user_names.append(f"{i+1}: {bot_user_names[i]}\n")
 
-{bot_user_names}
-"""
+        await checking.edit(
+            f"**__Total Users:__** `{user_count}`\n\n" + "".join(enumerated_bot_user_names)
         )
+        
+        await message.delete()
+        
     else:
         err = await message.reply("Error counting users.")
         await message.delete()
         await checking.delete()
         await asyncio.sleep(5)
         await err.delete()
+
+# --- Command to show information about the lunux system
+@bot.on_message(filters.command("server"))
+async def server_info(client: Client, message):
+    user_id = str(message.from_user.id)
+    userdict: dict = message.from_user
+    await mongo_check_user_database(str(user_id), userdict, message)
+
+    server_info_text = (
+        f"**__Server Information__**\n\n"
+        f"**Python Version:** {sys.version.split()[0]}\n"
+        f"**Pyrogram Version:** {pyrogram.__version__}\n"
+        f"**CPU Count:** {os.cpu_count()}\n"
+        f"**Total Disk Space:** {shutil.disk_usage('/').total / (1024. ** 3):.2f} GB total\n"
+        f"**Used:** {shutil.disk_usage('/').used / (1024. ** 3):.2f} GB used\n"
+        f"**Free:** {shutil.disk_usage('/').free / (1024. ** 3):.2f} GB free\n"
+    )
+    await message.reply(server_info_text, disable_web_page_preview=True)
+    
 
 
 # --- Callback Query Handler ---
