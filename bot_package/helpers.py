@@ -5,14 +5,27 @@ import asyncio
 from pyrogram import Client
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from pyrogram.errors import FloodWait
+import requests
 from .config import (
     PROGRESS_BAR_LENGTH,
     last_update_time,
     UPDATE_INTERVAL,
+    THUMBNAIL_PATH
 )
 from pymongo import MongoClient;
 from dotenv import load_dotenv
 load_dotenv()
+
+# --- MongoDB Connection ---
+
+pwd = os.getenv('MONGO_PWD')
+
+# connection string
+connection_string = f'mongodb+srv://myAtlasDBUser:{pwd}@pyroytbot.p1vptc2.mongodb.net/?retryWrites=true&w=majority&appName=PyroYtBot'
+
+# initialize the client
+client = MongoClient(connection_string)
+
 
 # --- Progress Bar ---
 def create_progress_bar(percentage: float, length: int = PROGRESS_BAR_LENGTH) -> str:
@@ -88,15 +101,6 @@ def get_user_download_path(user_id: int) -> str:
     return user_download_dir
 
 
-# --- MongoDB Connection ---
-
-pwd = os.getenv('MONGO_PWD')
-
-# connection string
-connection_string = f'mongodb+srv://myAtlasDBUser:{pwd}@pyroytbot.p1vptc2.mongodb.net/?retryWrites=true&w=majority&appName=PyroYtBot'
-
-# initialize the client
-client = MongoClient(connection_string)
 
 
 # create a document inside a collection
@@ -229,43 +233,49 @@ def list_all_sudo_users() -> list:
 
 
 # download thumbnail form a url and save it to a local path using requests asyncio
-async def download_thumbnail_async(url: str = None, local_path: str = None, user_id: str = None) -> tuple:
-    """Downloads a thumbnail from a URL and saves it to a local path."""
-    user_id = str(user_id)
+def download_thumbnail(thumbnail_url, thumb_name, user_id) -> tuple:
+    """Downloads a thumbnail from a url and saves it at a local path without asyncio"""
+    if not thumbnail_url or not thumb_name or not user_id:
+        print("Missing required parameters for thumbnail download.")
+        return None, None
     try:
-        work_dir = get_user_download_path(user_id)
-        if not os.path.exists(work_dir):
-            os.makedirs(work_dir, exist_ok=True)
-        os.chdir(work_dir)  # Change to the user's download directory
-        local_path = os.path.join(work_dir, local_path.replace(" ", "_"))
-    except Exception as e:
-        print(f"Error creating directory: {e}")
-        pass
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url) as response:
-                if response.status == 200:
-                    with open(local_path, "wb") as file:
-                        file.write(await response.read())
-                    print(f"Thumbnail downloaded successfully: {local_path}")
-                    return (True, local_path)
-                else:
-                    print(f"Failed to download thumbnail. Status code: {response.status}")
-                    return (False, None)
+        # Create the download path if it doesn't exist
+        download_path = get_user_download_path(user_id)
+        thumbnail_path = os.path.join(download_path, f"{thumb_name}.jpg")
+        # Download the thumbnail using requests
+        response = requests.get(thumbnail_url, stream=True)
+        if response.status_code == 200:
+            with open(thumbnail_path, "wb") as f:
+                for chunk in response.iter_content(2048):
+                    f.write(chunk)
+            print(f"Thumbnail downloaded successfully: {thumbnail_path}")
+            return True, thumbnail_path
+        else:
+            print(f"Failed to download thumbnail: {response.status_code}")
+            return False, None
     except Exception as e:
         print(f"Error downloading thumbnail: {e}")
-        return (False, None)
+        return False, None
+
 
 
 # convert the downloaded thumbnail to a Jpeg image with width and height not more than 320px320px using ffmpeg
-def convert_thumbnail_to_jpeg(*args) -> bool:
+def convert_thumbnail_to_jpeg(args: tuple) -> bool:
+    global THUMBNAIL_PATH
     """Converts a thumbnail to JPEG format with a maximum size of 320x320."""
-    _, lpath_ = download_thumbnail_async(args[0], args[1], args[2])
+    
+    thumbnail_url, thumb_name, user_id = args
+    _, thumbnail_path = download_thumbnail(thumbnail_url, thumb_name, user_id)
+    if not thumbnail_path:
+        print("Thumbnail path is None, conversion skipped.")
+        return
     try:
         # Use ffmpeg to convert and resize the image
-        os.system(f"ffmpeg -i {lpath_} -vf scale=320:320 -q:v 2 {lpath_} -y")
-        print(f"Thumbnail converted successfully: {lpath_}")
+        os.system(f"ffmpeg -i {thumbnail_path} -vf scale=320:320 -q:v 2 {thumbnail_path} -y")
+        # Update the global THUMBNAIL_PATH variable
+        THUMBNAIL_PATH.append(thumbnail_path)
+        print(f"Thumbnail converted successfully: {thumbnail_path}")
         return True
     except Exception as e:
         print(f"Error converting thumbnail: {e}")
-        return False
+        return

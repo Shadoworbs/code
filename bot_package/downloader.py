@@ -29,19 +29,20 @@ async def get_video_info(url: str):
             info_dict = await asyncio.to_thread(ydl.extract_info, url, download=False)
             title = info_dict.get("title", "Untitled Video")
             thumbnail_url = info_dict.get("thumbnail")
-            return title, thumbnail_url
+            video_id: str = info_dict.get("id")
+            return title, thumbnail_url, video_id
     except yt_dlp.utils.DownloadError as e:
         # Handle specific yt-dlp errors (e.g., private video, unavailable)
         print(f"yt-dlp error fetching video info for {url}: {e}")
         if "Private video" in str(e):
-            return "Private Video", None
+            return "Private Video", None, None
         elif "Video unavailable" in str(e):
-            return "Video Unavailable", None
+            return "Video Unavailable", None, None
         # Add more specific error checks if needed
-        return None, None  # General fetch error
+        return None, None, None  # General fetch error
     except Exception as e:
         print(f"Unexpected error fetching video info for {url}: {e}")
-        return None, None
+        return None, None, None  # General error
 
 
 def _run_yt_dlp_download(

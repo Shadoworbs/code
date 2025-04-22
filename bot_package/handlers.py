@@ -14,6 +14,7 @@ from .config import (
     LOG_CHANNEL,
     LINK_LOGS,
     AUTH_USERS,
+    THUMBNAIL_PATH,
     url_cache,
     last_update_time,
     UPDATE_INTERVAL,
@@ -23,7 +24,7 @@ from .helpers import (
     convert_thumbnail_to_jpeg,
     count_bot_users,
     count_sudo_users,
-    download_thumbnail_async,
+    download_thumbnail,
     get_resolution_buttons,
     create_progress_bar,
     edit_status_message,
@@ -247,7 +248,7 @@ async def restart_command(client: Client, message):
 
 
 # --- URL Handler ---
-
+VIDEO_ID = []
 
 @bot.on_message(
     filters.regex(
@@ -256,6 +257,7 @@ async def restart_command(client: Client, message):
     )
 )
 async def youtube_url_handler(client: Client, message):
+    global VIDEO_ID
     user_id = str(message.from_user.id)
     userdict: dict = message.from_user
     await mongo_check_user_database(str(user_id), userdict, message)
@@ -267,7 +269,7 @@ async def youtube_url_handler(client: Client, message):
 
     processing_msg = await message.reply("⏳ Processing link...")
     try:
-        title, thumbnail_url = await get_video_info(url)
+        title, thumbnail_url, video_id = await get_video_info(url)
 
         if title is None:
             await processing_msg.edit_text(
@@ -279,6 +281,15 @@ async def youtube_url_handler(client: Client, message):
             return
 
         url_cache[message.id] = url
+
+        print("Checking thumbnail status...")
+        args: tuple = (
+            thumbnail_url,
+            video_id, 
+            user_id,)
+        convert_thumbnail_to_jpeg(args)  # Convert thumbnail to JPEG
+        VIDEO_ID.append(video_id)  # Store the video ID for later use
+        print("Thumbnail conversion complete.")
 
         keyboard = get_resolution_buttons(message.id)
         caption = f"🎬 **{title}**\n\n{VIDEO_HEIGHT_TEXT}"
@@ -692,11 +703,9 @@ async def handle_callback_query(client: Client, callbackQuery: CallbackQuery):
                 f"{upl_text}\n**By:** {user.mention}\n**User ID:** `{user_id}`",
                 reply_markup=cancel_button_markup,  # Ensure cancel button is present at start of upload
             )
+            await asyncio.sleep(1)  # Brief pause before upload
 
-            title, thumbnail_url = await get_video_info(url)  # Get thumbnail URL again
-            print("Checking thumbnail status...")
-            args = (thumbnail_url, f"{filepath}.jpg", user_id)
-            thumbnail = convert_thumbnail_to_jpeg(args)
+            thumbnail = THUMBNAIL_PATH[-1] or None
 
             print("Uploading...")
             send = await client.send_video(
@@ -711,6 +720,7 @@ async def handle_callback_query(client: Client, callbackQuery: CallbackQuery):
                 supports_streaming=True,
                 progress=upload_progress,
             )
+            print("Upload complete.")
 
             # --- Upload Complete ---
             cleanup_progress_state(

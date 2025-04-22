@@ -41,6 +41,7 @@ print(f"Loaded AUTH_USERS: {AUTH_USERS}")
 CWD = os.getcwd()
 BASE_DOWNLOAD_PATH = os.path.join(CWD, "downloads")
 os.makedirs(BASE_DOWNLOAD_PATH, exist_ok=True)
+THUMBNAIL_PATH = []
 
 # --- Runtime Cache ---
 url_cache = {}
