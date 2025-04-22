@@ -37,7 +37,7 @@ from .helpers import (
     find_sudo_user_by_id,
     remove_a_sudo_user_from_the_db,
     list_all_sudo_users,
-    list_all_users
+    list_all_users,
 )
 from .downloader import get_video_info, download_video_async
 from replies import *  # Assuming replies.py exists and contains text variables
@@ -49,9 +49,7 @@ from buttons import (
 
 
 # --- MongoDB tools ---
-async def mongo_check_user_database(
-    userid: str, userdict=None, message=None
-) -> bool:
+async def mongo_check_user_database(userid: str, userdict=None, message=None) -> bool:
     if find_user_by_id_in_mongodb(userid) == "False":
         # If user not found, create a new document in MongoDB for the user
         info: dict = {
@@ -78,7 +76,7 @@ async def mongo_check_user_database(
 
 
 async def mongo_check_sudo_database(
-    userid: str, userdict: dict=None, message=None
+    userid: str, userdict: dict = None, message=None
 ) -> bool:
     if not await find_sudo_user_by_id(userid):
         # If user not found, create a new document in MongoDB for the user
@@ -97,8 +95,8 @@ async def mongo_check_sudo_database(
             "chat_id": message.chat.id or "None",
             "chat_title": message.chat.title or "None",
             "chat_type": str(message.chat.type) or "None",
-            "chat_username": message.chat.username or "None"
-            }
+            "chat_username": message.chat.username or "None",
+        }
 
         await add_a_sudo_user_to_the_db(info)
         return "True"
@@ -119,7 +117,6 @@ async def start_command(client: Client, message):
         reply_markup=InlineKeyboardMarkup(START_BUTTON),
         disable_web_page_preview=True,
     )
-
 
 
 @bot.on_message(filters.command("help"))
@@ -251,6 +248,7 @@ async def restart_command(client: Client, message):
 # --- URL Handler ---
 VIDEO_ID = []
 
+
 @bot.on_message(
     filters.regex(
         r"(https?://)?(www\.)?(youtube\.com|youtu\.?be)/.+(watch\?v=|embed/|v/|.+\?v=)?([^&\n]{11})",
@@ -286,8 +284,9 @@ async def youtube_url_handler(client: Client, message):
         print("Checking thumbnail status...")
         args: tuple = (
             thumbnail_url,
-            video_id, 
-            user_id,)
+            video_id,
+            user_id,
+        )
         convert_thumbnail_to_jpeg(args)  # Convert thumbnail to JPEG
         VIDEO_ID.append(video_id)  # Store the video ID for later use
         print("Thumbnail conversion complete.")
@@ -319,6 +318,7 @@ async def youtube_url_handler(client: Client, message):
 
 
 ##### Add a sudo user ########
+
 
 @bot.on_message(filters.command("addsudo"))
 async def add_sudo_user(client: Client, message):
@@ -372,7 +372,7 @@ async def add_sudo_user(client: Client, message):
         and find_sudo_user_by_id(str(message.text.split(" ")[1].strip())) == "False"
     ):
         sudo_user_id: str = str(message_text).split(" ")[1]
-        user_info = await bot.get_chat(sudo_user_id)
+        user_info = await bot.get_users(sudo_user_id)
         info: dict = {
             "_id": sudo_user_id or "None",
             "date_time": message.date or "None",
@@ -430,7 +430,7 @@ async def remove_sudo_user(client: Client, message):
         and find_sudo_user_by_id(str(message.text.split(" ")[1].strip())) == "True"
     ):
         sudo_user_id: str = str(message_text).split(" ")[1]
-        user_info = await bot.get_chat(sudo_user_id)
+        user_info = await bot.get_users(sudo_user_id)
         remove_a_sudo_user_from_the_db(sudo_user_id)
         await message.reply(f"{user_info.first_name} removed from Sudo users")
         return
@@ -442,15 +442,13 @@ async def remove_sudo_user(client: Client, message):
 
 # ---- List sudo users --------#
 
+
 @bot.on_message(filters.command("sudo"))
 async def list_sudo_users(client: Client, message):
     sudo_user_names = list_all_sudo_users()
     enumerated_sudo_user_names = []
     user_id = str(message.from_user.id)
-    if (
-        user_id not in AUTH_USERS
-        and find_sudo_user_by_id(user_id) == "False"
-    ):
+    if user_id not in AUTH_USERS and find_sudo_user_by_id(user_id) == "False":
         not_authorized = await message.reply(
             "You are not authorized to use this command"
         )
@@ -460,13 +458,15 @@ async def list_sudo_users(client: Client, message):
         return
     checking = await message.reply("Checking sudo users...")
     sudo_users_count = count_sudo_users()
-    if sudo_users_count != 0:
+
+    if sudo_users_count > 0:
         # print all the elements in the list with a prefix starting with 1
         for i in range(len(sudo_user_names)):
-            enumerated_sudo_user_names.append(f"{i+1}: {sudo_user_names[i]}\n")
+            enumerated_sudo_user_names.append(f"{i+1}. {sudo_user_names[i]}\n")
         await message.delete()
         await checking.edit(
-            f"**__Total Sudo Users:__** `{sudo_users_count}`\n\n" + "\n".join(sudo_user_names)
+            f"**__Sudo Users:__** `{sudo_users_count}`\n\n"
+            + "".join(enumerated_sudo_user_names)
         )
     else:
         err = await message.reply("Error counting sudo users.")
@@ -482,12 +482,10 @@ async def list_sudo_users(client: Client, message):
 @bot.on_message(filters.command("users"))
 async def list_users(client: Client, message):
     bot_user_names = list_all_users()
+    bot_user_count = count_bot_users()
     enumerated_bot_user_names = []
     user_id = str(message.from_user.id)
-    if (
-        user_id not in AUTH_USERS
-        and find_user_by_id_in_mongodb(user_id) == "False"
-    ):
+    if user_id not in AUTH_USERS and find_user_by_id_in_mongodb(user_id) == "False":
         not_authorized = await message.reply(
             "You are not authorized to use this command"
         )
@@ -496,24 +494,25 @@ async def list_users(client: Client, message):
         await not_authorized.delete()
         return
     checking = await message.reply("Checking database...")
-    user_count = count_bot_users()
-    if user_count != 0:
+    if bot_user_count > 0:
         # print all the elements in the list with a prefix starting with 1
         for i in range(len(bot_user_names)):
-            enumerated_bot_user_names.append(f"{i+1}: {bot_user_names[i]}\n")
+            enumerated_bot_user_names.append(f"{i+1}. {bot_user_names[i]}\n")
 
         await checking.edit(
-            f"**__Total Users:__** `{user_count}`\n\n" + "".join(enumerated_bot_user_names)
+            f"**__Total Users:__** `{bot_user_count}`\n\n"
+            + "".join(enumerated_bot_user_names)
         )
-        
+
         await message.delete()
-        
+
     else:
         err = await message.reply("Error counting users.")
         await message.delete()
         await checking.delete()
         await asyncio.sleep(5)
         await err.delete()
+
 
 # --- Command to show information about the lunux system
 @bot.on_message(filters.command("server"))
@@ -531,8 +530,7 @@ async def server_info(client: Client, message):
         f"**Used:** {shutil.disk_usage('/').used / (1024. ** 3):.2f} GB used\n"
         f"**Free:** {shutil.disk_usage('/').free / (1024. ** 3):.2f} GB free\n"
     )
-    await message.reply(server_info_text, disable_web_page_preview=True)
-    
+    await message.reply(server_info_text)
 
 
 # --- Callback Query Handler ---
@@ -761,7 +759,7 @@ async def handle_callback_query(client: Client, callbackQuery: CallbackQuery):
             if LOG_CHANNEL:
                 try:
                     log_channel_id = int(LOG_CHANNEL)  # Ensure it's an int
-                    await bot.forward_messages(log_channel_id, chat_id, send.id)
+                    await bot.copy_message(log_channel_id, chat_id, send.id)
                 except (ValueError, PeerIdInvalid) as log_err:
                     print(
                         f"Error forwarding to LOG_CHANNEL ({LOG_CHANNEL}): {log_err}. Check ID and bot membership."

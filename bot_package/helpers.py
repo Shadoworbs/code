@@ -195,15 +195,17 @@ def remove_a_sudo_user_from_the_db(id: str) -> str:
     except Exception as e:
         print(f"Error removing document: {e}")
         return "False"
-    
-# counting all documents in a database
-def count_sudo_users() -> str:
-    count = client.sudo_db.sudo_users.count_documents(filter={})
-    return str(count)
 
-def count_bot_users() -> str:
-    count = client.bot_db.bot_collection.count_documents(filter={})
-    return str(count)
+
+# counting all documents in a database
+def count_sudo_users() -> int:
+    count: int = client.sudo_db.sudo_users.count_documents(filter={})
+    return count
+
+def count_bot_users() -> int:
+    count: int = client.bot_db.bot_collection.count_documents(filter={})
+    return count
+
 
 # list all users in the bot database by their first name
 def list_all_users() -> list:
@@ -212,12 +214,13 @@ def list_all_users() -> list:
         bot_db = client.bot_db
         bot_collection = bot_db.bot_collection
         users = bot_collection.find({})
-        user_list = [f"{user["fist_name"]} `{user["_id"]}`" for user in users]
+        user_list = [f"{user["first_name"]} `{user["_id"]}`" for user in users]
         return user_list
     except Exception as e:
         print(f"Error listing users: {e}")
         return f"Error listing user names: {e}"
     
+
 # list all sudo users in the bot database by their first name
 def list_all_sudo_users() -> list:
     """Lists all sudo users in the bot database."""
@@ -225,7 +228,7 @@ def list_all_sudo_users() -> list:
         sudo_db = client.sudo_db
         bot_collection = sudo_db.sudo_users
         users = bot_collection.find({})
-        sudo_list = [f"{user["fist_name"]} `{user["_id"]}`" for user in users]
+        sudo_list = [f"{user["first_name"]} `{user["_id"]}`" for user in users]
         return sudo_list
     except Exception as e:
         print(f"Error listing sudo users: {e}")
