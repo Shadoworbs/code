@@ -269,7 +269,7 @@ async def _do_restart(client: Client):
 async def restart_command(client: Client, message):
     user_id = str(message.from_user.id)
     userdict: dict = message.from_user
-    mongo_check_user_database(str(user_id), userdict, message)
+    await mongo_check_user_database(str(user_id), userdict, message)
     chat_id = message.chat.id
 
     if user_id not in AUTH_USERS:
