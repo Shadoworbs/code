@@ -27,7 +27,7 @@ from .config import (
     rate_limit_cache,
     RATE_LIMIT_MESSAGES,
     RATE_LIMIT_DURATION,
-    download_limit_cache
+    download_limit_cache,
 )
 from .helpers import (
     convert_thumbnail_to_jpeg,
@@ -54,7 +54,13 @@ from .helpers import (
     check_rate_limit,
     is_user_banned,
 )
-from .downloader import get_video_info, download_video_async
+from .downloader import get_playlist_info, get_video_info, download_video_async
+from .playlist_buttons import (
+    get_playlist_info_button,
+    get_playlist_videos_buttons,
+    get_video_selection_buttons,
+    format_duration,
+)
 from replies import *  # Assuming replies.py exists and contains text variables
 from buttons import (
     START_BUTTON,
@@ -186,12 +192,11 @@ async def about_command(client: Client, message):
     userdict: dict = message.from_user
     await mongo_check_user_database(str(user_id), userdict, message)
 
-    text="""**__🤖 Bot Details:__**\n
+    text = """**__🤖 Bot Details:__**\n
 **Creator:** Shadow Orbs
 **Language:** Python 3
 **Library:** Pyrogram
 **Repo:** Click button below."""
-
 
     await message.reply(
         text=text,
@@ -305,11 +310,13 @@ async def restart_command(client: Client, message):
 
 # --- URL Handler ---
 VIDEO_ID = []
+playlist_cache = {}
+selected_videos = {}
 
 
 @bot.on_message(
     filters.regex(
-        r"(https?://)?(www\.)?(youtube\.com|youtu\.?be)/.+(watch\?v=|embed/|v/|.+\?v=)?([^&\n]{11})",
+        r"(https?://)?(www\.)?(youtube\.com|youtu\.?be)/.+(watch\?v=|embed/|v/|.+\?v=)?([^&\n]{11}|playlist\?list=[a-zA-Z0-9_-]+)",
         re.IGNORECASE,
     )
 )
@@ -345,12 +352,43 @@ async def youtube_url_handler(client: Client, message):
             return
 
     url = message.text.strip()
-    if not ("youtu" in url or "youtube" in url):
-        print(f"Ignoring non-YouTube URL passed regex: {url}")
-        return
-
     processing_msg = await message.reply("⏳ Processing link...")
+
     try:
+        # Check if it's a playlist URL
+        if "playlist?list=" in url:
+            playlist_info = await get_playlist_info(url)
+            if not playlist_info:
+                await processing_msg.edit_text(
+                    "❌ Could not fetch playlist information."
+                )
+                return
+
+            # Cache playlist info
+            playlist_cache[message.id] = {
+                "info": playlist_info,
+                "url": url,
+                "selected_videos": set(),  # Track selected videos
+            }
+
+            # Calculate total duration
+            total_duration = format_duration(playlist_info["total_duration"])
+
+            # Create playlist info message
+            text = (
+                f"📋 **Playlist: {playlist_info['title']}**\n"
+                f"👤 Uploader: {playlist_info['uploader']}\n"
+                f"🎬 Videos: {playlist_info['video_count']}\n"
+                f"⏱ Total Duration: {total_duration}\n\n"
+                "Select an option below:"
+            )
+
+            await processing_msg.edit_text(
+                text, reply_markup=get_playlist_info_button(message.id)
+            )
+            return
+
+        # Existing single video logic...
         title, thumbnail_url, video_id = await get_video_info(url)
 
         if title is None:
@@ -393,11 +431,12 @@ async def youtube_url_handler(client: Client, message):
         await processing_msg.delete()
 
     except Exception as e:
-        print(f"Error processing YouTube URL {url}: {e}")
+        print(f"Error processing URL {url}: {e}")
         await processing_msg.edit_text(
             f"⚠️ An error occurred while processing the link:\n`{e}`"
         )
         url_cache.pop(message.id, None)
+        playlist_cache.pop(message.id, None)  # Clean up playlist cache too
 
 
 ##### Add a sudo user ########
@@ -620,6 +659,7 @@ async def server_info(client: Client, message):
 
 # --- Admin Commands ---
 
+
 @bot.on_message(filters.command("broadcast", COMMAND_PREFIXES))
 async def broadcast_cmd(client: Client, message):
     """Broadcast a message to all users"""
@@ -741,7 +781,7 @@ async def set_commands_handler(bot: Client, message: pyrogram.types.Message):
     if user_id not in AUTH_USERS and find_sudo_user_by_id(user_id) == "False":
         await message.reply("⛔ You are not authorized to use this command.")
         return
-    
+
     command = message.command[0].lower()
 
     if command == "setcommands":
@@ -797,292 +837,586 @@ async def handle_callback_query(client: Client, callbackQuery: CallbackQuery):
             await callbackQuery.answer("⚠️ Error cancelling request.", show_alert=True)
         return
 
-    # --- Resolution Selection & Download/Upload Logic ---
-    if (
-        ":" in data
-        and data.split(":", 1)[0].isdigit()
-        and data.split(":", 1)[1].isdigit()
-    ):
+    # --- Playlist Related Callbacks ---
+    if data.startswith("playlist_videos:"):
         try:
-            height_str, original_msg_id_str = data.split(":", 1)
-            height = int(height_str)
-            original_msg_id = int(
-                original_msg_id_str
-            )  # Get the ID of the message that triggered the download
+            msg_id = int(data.split(":")[1])
+            playlist_data = playlist_cache.get(msg_id)
 
-            # Check if the request is still valid (URL exists in cache)
-            url = url_cache.get(original_msg_id)
-            if not url:
+            if not playlist_data:
                 await callbackQuery.answer(
-                    "⌛ Request expired or bot restarted. Please send the link again.",
+                    "⌛ Playlist data expired. Please send the link again.",
                     show_alert=True,
                 )
-                try:
-                    await message.delete()  # Delete the resolution selection message
-                except Exception:
-                    pass
                 return
 
-            # Acknowledge the button press
-            await callbackQuery.answer("⏳ Processing your request...")
-            try:
-                await message.delete()  # Delete the resolution selection message
-            except Exception:
-                pass
-
-            # --- Setup Cancellation ---
-            cancel_event = asyncio.Event()
-            active_downloads[original_msg_id] = (
-                cancel_event  # Store the event using the original message ID
+            # Show the first page of videos
+            await message.edit_text(
+                f"📋 **Select videos from {playlist_data['info']['title']}**\n"
+                f"Click on videos to select/deselect them:",
+                reply_markup=get_playlist_videos_buttons(
+                    msg_id, playlist_data["info"]["entries"]
+                ),
+            )
+            await callbackQuery.answer()
+        except Exception as e:
+            print(f"Error handling playlist videos: {e}")
+            await callbackQuery.answer(
+                "⚠️ An error occurred while loading playlist videos.", show_alert=True
             )
 
-            # --- Create Cancel Button Markup ---
-            cancel_button_markup = InlineKeyboardMarkup(
-                [
-                    [
-                        InlineKeyboardButton(
-                            "❌ Cancel", callback_data=f"cancel:{original_msg_id}"
+    elif data.startswith("playlist_page:"):
+        try:
+            msg_id, page = map(int, data.split(":")[1:])
+            playlist_data = playlist_cache.get(msg_id)
+
+            if not playlist_data:
+                await callbackQuery.answer(
+                    "⌛ Playlist data expired. Please send the link again.",
+                    show_alert=True,
+                )
+                return
+
+            await message.edit_reply_markup(
+                reply_markup=get_playlist_videos_buttons(
+                    msg_id, playlist_data["info"]["entries"], page=page
+                )
+            )
+            await callbackQuery.answer()
+        except Exception as e:
+            print(f"Error handling playlist page navigation: {e}")
+            await callbackQuery.answer(
+                "⚠️ An error occurred while navigating playlist pages.", show_alert=True
+            )
+
+    elif data.startswith("select_video:"):
+        try:
+            msg_id, video_idx = map(int, data.split(":")[1:])
+            playlist_data = playlist_cache.get(msg_id)
+            video_idx = int(video_idx)
+
+            if not playlist_data:
+                await callbackQuery.answer(
+                    "⌛ Playlist data expired. Please send the link again.",
+                    show_alert=True,
+                )
+                return
+
+            # Toggle video selection
+            if video_idx in playlist_data["selected_videos"]:
+                playlist_data["selected_videos"].remove(video_idx)
+                await callbackQuery.answer("✅ Video removed from selection")
+            else:
+                playlist_data["selected_videos"].add(video_idx)
+                await callbackQuery.answer("✅ Video added to selection")
+
+            # Update the message to reflect the new selection state
+            await message.edit_reply_markup(
+                reply_markup=get_playlist_videos_buttons(
+                    msg_id,
+                    playlist_data["info"]["entries"],
+                    page=0,  # Reset to first page after selection
+                )
+            )
+        except Exception as e:
+            print(f"Error handling video selection: {e}")
+            await callbackQuery.answer(
+                "⚠️ An error occurred while selecting the video.", show_alert=True
+            )
+
+    elif data.startswith("confirm_selection:"):
+        try:
+            msg_id = int(data.split(":")[1])
+            playlist_data = playlist_cache.get(msg_id)
+
+            if not playlist_data:
+                await callbackQuery.answer(
+                    "⌛ Playlist data expired. Please send the link again.",
+                    show_alert=True,
+                )
+                return
+
+            if not playlist_data["selected_videos"]:
+                await callbackQuery.answer(
+                    "⚠️ Please select at least one video first!", show_alert=True
+                )
+                return
+
+            # Show resolution selection for the first selected video
+            selected_videos = sorted(playlist_data["selected_videos"])
+            first_video = playlist_data["info"]["entries"][selected_videos[0]]
+            total_selected = len(selected_videos)
+
+            selection_text = (
+                f"🎬 **{first_video['title']}**"
+                f"{f' (and {total_selected-1} more videos)' if total_selected > 1 else ''}\n\n"
+                "Select video quality for all selected videos:"
+            )
+
+            await message.edit_text(
+                selection_text, reply_markup=get_video_selection_buttons(msg_id)
+            )
+            await callbackQuery.answer()
+        except Exception as e:
+            print(f"Error handling selection confirmation: {e}")
+            await callbackQuery.answer(
+                "⚠️ An error occurred while confirming selection.", show_alert=True
+            )
+
+    elif data.startswith("download_all:"):
+        try:
+            msg_id = int(data.split(":")[1])
+            playlist_data = playlist_cache.get(msg_id)
+
+            if not playlist_data:
+                await callbackQuery.answer(
+                    "⌛ Playlist data expired. Please send the link again.",
+                    show_alert=True,
+                )
+                return
+
+            # Select all videos
+            playlist_data["selected_videos"] = set(
+                range(len(playlist_data["info"]["entries"]))
+            )
+
+            # Show resolution selection
+            first_video = playlist_data["info"]["entries"][0]
+            total_videos = len(playlist_data["info"]["entries"])
+
+            await message.edit_text(
+                f"🎬 **{first_video['title']}** (and {total_videos-1} more)\n\n"
+                "Select video quality for all videos:",
+                reply_markup=get_video_selection_buttons(msg_id),
+            )
+            await callbackQuery.answer("✅ Selected all videos in playlist")
+        except Exception as e:
+            print(f"Error handling download all: {e}")
+            await callbackQuery.answer(
+                "⚠️ An error occurred while selecting all videos.", show_alert=True
+            )
+
+    # Add this section before the existing resolution selection logic
+    elif ":" in data and data.split(":")[0].isdigit() and data.split(":")[1].isdigit():
+        try:
+            height_str, msg_id_str = data.split(":", 1)
+            height = int(height_str)
+            msg_id = int(msg_id_str)
+
+            # Check if this is a playlist download
+            playlist_data = playlist_cache.get(msg_id)
+            if playlist_data and playlist_data["selected_videos"]:
+                # Process playlist download
+                await process_playlist_download(
+                    client, message, user, height, playlist_data, callbackQuery
+                )
+                return
+
+            # Continue with existing single video download logic...
+            # --- Resolution Selection & Download/Upload Logic ---
+            if (
+                ":" in data
+                and data.split(":", 1)[0].isdigit()
+                and data.split(":", 1)[1].isdigit()
+            ):
+                try:
+                    height_str, original_msg_id_str = data.split(":", 1)
+                    height = int(height_str)
+                    original_msg_id = int(
+                        original_msg_id_str
+                    )  # Get the ID of the message that triggered the download
+
+                    # Check if the request is still valid (URL exists in cache)
+                    url = url_cache.get(original_msg_id)
+                    if not url:
+                        await callbackQuery.answer(
+                            "⌛ Request expired or bot restarted. Please send the link again.",
+                            show_alert=True,
                         )
-                    ]
-                ]
-            )
+                        try:
+                            await message.delete()  # Delete the resolution selection message
+                        except Exception:
+                            pass
+                        return
 
-            # --- Send Initial Status Message (with Cancel Button) ---
-            status_msg = await client.send_message(
-                chat_id,
-                f"{dl_text}\n**By:** {user.mention}\n**User ID:** `{user_id}`",
-                reply_markup=cancel_button_markup,  # Add cancel button here
-            )
-            last_update_time[(chat_id, status_msg.id)] = (
-                time.time()
-            )  # Initialize update time
+                    # Acknowledge the button press
+                    await callbackQuery.answer("⏳ Processing your request...")
+                    try:
+                        await message.delete()  # Delete the resolution selection message
+                    except Exception:
+                        pass
 
-            # --- Start Download ---
-            filepath, title, extension = await download_video_async(
-                user_id,
-                height,
-                url,
-                status_msg,
-                user.mention,
-                original_msg_id,
-                cancel_button_markup,  # Pass the markup here
-            )
-
-            # --- Check for Cancellation or Download Failure ---
-            if cancel_event.is_set():
-                print(f"Download cancelled by user for {url}.")
-                cleanup_progress_state(chat_id, status_msg.id)
-                try:
-                    await edit_status_message(status_msg, "❌ Download cancelled.")
-                    await asyncio.sleep(5)
-                    await status_msg.delete()
-                except Exception as e:
-                    print(
-                        f"Error updating/deleting status message after download cancel: {e}"
+                    # --- Setup Cancellation ---
+                    cancel_event = asyncio.Event()
+                    active_downloads[original_msg_id] = (
+                        cancel_event  # Store the event using the original message ID
                     )
-                return  # Stop processing
 
-            if not filepath:
-                print(f"Download failed for {url}. Filepath is None.")
-                # Error message should be handled within download_video_async or caught by the main exception block
-                # Ensure cleanup if status_msg exists
-                if status_msg:
-                    cleanup_progress_state(chat_id, status_msg.id)
-                return  # Stop processing
-
-            # --- Download Complete, Prepare Upload ---
-            cleanup_progress_state(
-                chat_id, status_msg.id
-            )  # Clean download progress state
-            await edit_status_message(
-                status_msg,
-                f"✅ **Download complete.** Preparing upload...",
-                reply_markup=cancel_button_markup,  # Keep cancel button during preparation
-            )
-            await asyncio.sleep(1)  # Brief pause
-
-            # Re-initialize last update time for upload progress
-            last_update_time[(chat_id, status_msg.id)] = time.time()
-
-            # --- Upload Progress Callback ---
-            async def upload_progress(current, total):
-                # Check for cancellation signal during upload
-                if cancel_event.is_set():
-                    print(
-                        "Upload cancellation signal received during progress callback."
+                    # --- Create Cancel Button Markup ---
+                    cancel_button_markup = InlineKeyboardMarkup(
+                        [
+                            [
+                                InlineKeyboardButton(
+                                    "❌ Cancel",
+                                    callback_data=f"cancel:{original_msg_id}",
+                                )
+                            ]
+                        ]
                     )
-                    # Attempt to stop the upload (Pyrogram might handle this with CancelledError)
-                    raise asyncio.CancelledError("Upload cancelled by user.")
 
-                if total == 0:
-                    return
-                message_id = status_msg.id
-                percentage = current * 100 / total
-                progress_bar = create_progress_bar(percentage)
-                current_mb = current / (1024 * 1024)
-                total_mb = total / (1024 * 1024)
-                progress_text = (
-                    f"{upl_text}\n"
-                    f"**By:** {user.mention}\n**User ID:** `{user_id}`\n\n"
-                    f"**Progress:** {progress_bar} {percentage:.1f}%\n"
-                    f"`{current_mb:.2f} MB / {total_mb:.2f} MB`"
-                )
-                loop = asyncio.get_running_loop()
-                # Edit message with progress AND the cancel button
-                asyncio.run_coroutine_threadsafe(
-                    edit_status_message(
+                    # --- Send Initial Status Message (with Cancel Button) ---
+                    status_msg = await client.send_message(
+                        chat_id,
+                        f"{dl_text}\n**By:** {user.mention}\n**User ID:** `{user_id}`",
+                        reply_markup=cancel_button_markup,  # Add cancel button here
+                    )
+                    last_update_time[(chat_id, status_msg.id)] = (
+                        time.time()
+                    )  # Initialize update time
+
+                    # --- Start Download ---
+                    filepath, title, extension = await download_video_async(
+                        user_id,
+                        height,
+                        url,
                         status_msg,
-                        progress_text,
-                        reply_markup=cancel_button_markup,  # Pass markup here
-                    ),
-                    loop,
-                )
+                        user.mention,
+                        original_msg_id,
+                        cancel_button_markup,  # Pass the markup here
+                    )
 
-            # --- Start Upload ---
-            await edit_status_message(
-                status_msg,
-                f"{upl_text}\n**By:** {user.mention}\n**User ID:** `{user_id}`",
-                reply_markup=cancel_button_markup,  # Ensure cancel button is present at start of upload
-            )
-            await asyncio.sleep(1)  # Brief pause before upload
+                    # --- Check for Cancellation or Download Failure ---
+                    if cancel_event.is_set():
+                        print(f"Download cancelled by user for {url}.")
+                        cleanup_progress_state(chat_id, status_msg.id)
+                        try:
+                            await edit_status_message(
+                                status_msg, "❌ Download cancelled."
+                            )
+                            await asyncio.sleep(5)
+                            await status_msg.delete()
+                        except Exception as e:
+                            print(
+                                f"Error updating/deleting status message after download cancel: {e}"
+                            )
+                        return  # Stop processing
 
-            thumbnail = THUMBNAIL_PATH[-1] or None
+                    if not filepath:
+                        print(f"Download failed for {url}. Filepath is None.")
+                        # Error message should be handled within download_video_async or caught by the main exception block
+                        # Ensure cleanup if status_msg exists
+                        if status_msg:
+                            cleanup_progress_state(chat_id, status_msg.id)
+                        return  # Stop processing
 
-            print("Uploading...")
-            send = await client.send_video(
-                chat_id=chat_id,
-                video=filepath,
-                thumb=thumbnail,  # Use thumbnail if available
-                reply_markup=InlineKeyboardMarkup(
-                    DL_COMPLETE_BUTTON
-                ),  # Final message buttons
-                caption=f"✅ **Hey** {user.mention}\n{DL_COMPLETE_TEXT.format(url, title)}\n\nVia @{client.me.username}\n",
-                file_name=f"{title}.{extension}",
-                supports_streaming=True,
-                progress=upload_progress,
-            )
-            print("Upload complete.")
+                    # --- Download Complete, Prepare Upload ---
+                    cleanup_progress_state(
+                        chat_id, status_msg.id
+                    )  # Clean download progress state
+                    await edit_status_message(
+                        status_msg,
+                        f"✅ **Download complete.** Preparing upload...",
+                        reply_markup=cancel_button_markup,  # Keep cancel button during preparation
+                    )
+                    await asyncio.sleep(1)  # Brief pause
 
-            # --- Upload Complete ---
-            cleanup_progress_state(
-                chat_id, status_msg.id
-            )  # Clean upload progress state
-            await status_msg.delete()  # Delete the status message
+                    # Re-initialize last update time for upload progress
+                    last_update_time[(chat_id, status_msg.id)] = time.time()
 
-            # --- Logging ---
-            log_caption = f"**Filename:**\n`{title}.{extension}`\n\n**User:** {user.mention}\n**ID:** `{user_id}`"
+                    # --- Upload Progress Callback ---
+                    async def upload_progress(current, total):
+                        # Check for cancellation signal during upload
+                        if cancel_event.is_set():
+                            print(
+                                "Upload cancellation signal received during progress callback."
+                            )
+                            # Attempt to stop the upload (Pyrogram might handle this with CancelledError)
+                            raise asyncio.CancelledError("Upload cancelled by user.")
 
-            # Forward to LOG_CHANNEL
-            if LOG_CHANNEL:
-                try:
-                    log_channel_id = int(LOG_CHANNEL)  # Ensure it's an int
-                    await bot.copy_message(log_channel_id, chat_id, send.id)
-                except (ValueError, PeerIdInvalid) as log_err:
+                        if total == 0:
+                            return
+                        message_id = status_msg.id
+                        percentage = current * 100 / total
+                        progress_bar = create_progress_bar(percentage)
+                        current_mb = current / (1024 * 1024)
+                        total_mb = total / (1024 * 1024)
+                        progress_text = (
+                            f"{upl_text}\n"
+                            f"**By:** {user.mention}\n**User ID:** `{user_id}`\n\n"
+                            f"**Progress:** {progress_bar} {percentage:.1f}%\n"
+                            f"`{current_mb:.2f} MB / {total_mb:.2f} MB`"
+                        )
+                        loop = asyncio.get_running_loop()
+                        # Edit message with progress AND the cancel button
+                        asyncio.run_coroutine_threadsafe(
+                            edit_status_message(
+                                status_msg,
+                                progress_text,
+                                reply_markup=cancel_button_markup,  # Pass markup here
+                            ),
+                            loop,
+                        )
+
+                    # --- Start Upload ---
+                    await edit_status_message(
+                        status_msg,
+                        f"{upl_text}\n**By:** {user.mention}\n**User ID:** `{user_id}`",
+                        reply_markup=cancel_button_markup,  # Ensure cancel button is present at start of upload
+                    )
+                    await asyncio.sleep(1)  # Brief pause before upload
+
+                    thumbnail = THUMBNAIL_PATH[-1] or None
+
+                    print("Uploading...")
+                    send = await client.send_video(
+                        chat_id=chat_id,
+                        video=filepath,
+                        thumb=thumbnail,  # Use thumbnail if available
+                        reply_markup=InlineKeyboardMarkup(
+                            DL_COMPLETE_BUTTON
+                        ),  # Final message buttons
+                        caption=f"✅ **Hey** {user.mention}\n{DL_COMPLETE_TEXT.format(url, title)}\n\nVia @{client.me.username}\n",
+                        file_name=f"{title}.{extension}",
+                        supports_streaming=True,
+                        progress=upload_progress,
+                    )
+                    print("Upload complete.")
+
+                    # --- Upload Complete ---
+                    cleanup_progress_state(
+                        chat_id, status_msg.id
+                    )  # Clean upload progress state
+                    await status_msg.delete()  # Delete the status message
+
+                    # --- Logging ---
+                    log_caption = f"**Filename:**\n`{title}.{extension}`\n\n**User:** {user.mention}\n**ID:** `{user_id}`"
+
+                    # Forward to LOG_CHANNEL
+                    if LOG_CHANNEL:
+                        try:
+                            log_channel_id = int(LOG_CHANNEL)  # Ensure it's an int
+                            await bot.copy_message(log_channel_id, chat_id, send.id)
+                        except (ValueError, PeerIdInvalid) as log_err:
+                            print(
+                                f"Error forwarding to LOG_CHANNEL ({LOG_CHANNEL}): {log_err}. Check ID and bot membership."
+                            )
+                        except Exception as fwd_err:
+                            print(
+                                f"Unexpected error forwarding message to {LOG_CHANNEL}: {fwd_err}"
+                            )
+
+                    # Send info to LINK_LOGS
+                    if LINK_LOGS:
+                        try:
+                            link_log_id = LINK_LOGS  # Ensure it's an int
+                            url_LOG_BUTTON = [[InlineKeyboardButton("URL 🔗", url=url)]]
+                            await bot.send_message(
+                                link_log_id,
+                                log_caption,
+                                reply_markup=InlineKeyboardMarkup(url_LOG_BUTTON),
+                            )
+                        except (ValueError, PeerIdInvalid) as log_err:
+                            print(
+                                f"Error sending to LINK_LOGS ({LINK_LOGS}): {log_err}. Check ID and bot membership."
+                            )
+                        except Exception as log_err:
+                            print(
+                                f"Unexpected error sending link log to {LINK_LOGS}: {log_err}"
+                            )
+
+                # --- General Exception Handling ---
+                except asyncio.CancelledError:
                     print(
-                        f"Error forwarding to LOG_CHANNEL ({LOG_CHANNEL}): {log_err}. Check ID and bot membership."
+                        f"Upload cancelled explicitly for user {user_id}, original message {original_msg_id}."
                     )
-                except Exception as fwd_err:
-                    print(
-                        f"Unexpected error forwarding message to {LOG_CHANNEL}: {fwd_err}"
-                    )
+                    if status_msg:
+                        try:
+                            cleanup_progress_state(status_msg.chat.id, status_msg.id)
+                            await edit_status_message(
+                                status_msg, "❌ Upload cancelled."
+                            )
+                            await asyncio.sleep(5)
+                            await status_msg.delete()
+                        except Exception as e:
+                            print(
+                                f"Error updating/deleting status message after upload cancel: {e}"
+                            )
 
-            # Send info to LINK_LOGS
-            if LINK_LOGS:
-                try:
-                    link_log_id = LINK_LOGS  # Ensure it's an int
-                    url_LOG_BUTTON = [[InlineKeyboardButton("URL 🔗", url=url)]]
-                    await bot.send_message(
-                        link_log_id,
-                        log_caption,
-                        reply_markup=InlineKeyboardMarkup(url_LOG_BUTTON),
-                    )
-                except (ValueError, PeerIdInvalid) as log_err:
-                    print(
-                        f"Error sending to LINK_LOGS ({LINK_LOGS}): {log_err}. Check ID and bot membership."
-                    )
-                except Exception as log_err:
-                    print(
-                        f"Unexpected error sending link log to {LINK_LOGS}: {log_err}"
-                    )
-
-        # --- General Exception Handling ---
-        except asyncio.CancelledError:
-            print(
-                f"Upload cancelled explicitly for user {user_id}, original message {original_msg_id}."
-            )
-            if status_msg:
-                try:
-                    cleanup_progress_state(status_msg.chat.id, status_msg.id)
-                    await edit_status_message(status_msg, "❌ Upload cancelled.")
-                    await asyncio.sleep(5)
-                    await status_msg.delete()
                 except Exception as e:
                     print(
-                        f"Error updating/deleting status message after upload cancel: {e}"
+                        f"Error in callback handler for user {user_id}, data '{data}': {type(e).__name__} - {e}"
                     )
+                    error_message = f"⚠️ {user.mention}, an error occurred processing your request.\n\n`{type(e).__name__}: {e}`"
+                    if status_msg:
+                        try:
+                            cleanup_progress_state(status_msg.chat.id, status_msg.id)
+                            # Edit status message without cancel button on error
+                            await edit_status_message(status_msg, error_message)
+                        except Exception as edit_err:
+                            print(f"Failed to edit status message on error: {edit_err}")
+                            # Fallback to sending a new message if editing fails
+                            await client.send_message(
+                                chat_id,
+                                error_message,
+                                reply_to_message_id=(
+                                    original_msg_id if original_msg_id else None
+                                ),
+                            )
+                    else:
+                        # Send error message if status_msg was never created
+                        await client.send_message(
+                            chat_id,
+                            error_message,
+                            reply_to_message_id=(
+                                original_msg_id if original_msg_id else None
+                            ),
+                        )
+                    try:
+                        # Acknowledge the callback query even on error
+                        await callbackQuery.answer(
+                            "⚠️ An error occurred.", show_alert=True
+                        )
+                    except Exception:
+                        pass  # Ignore if answering fails (e.g., query expired)
+
+                # --- Final Cleanup ---
+                finally:
+                    # Add a small delay before attempting file deletion
+                    await asyncio.sleep(2)  # Wait 2 seconds
+
+                    # Remove downloaded file if it exists
+                    if filepath and os.path.exists(filepath):
+                        try:
+                            os.remove(filepath)
+                            print(f"Removed file: {filepath}")
+                        except PermissionError as pe:
+                            print(
+                                f"PermissionError removing file {filepath}: {pe}. File might still be locked."
+                            )
+                        except OSError as rm_err:
+                            print(f"Error removing file {filepath}: {rm_err}")
+
+                    # Clean up caches and active download state associated with the original message ID
+                    if original_msg_id:
+                        url_cache.pop(original_msg_id, None)
+                        active_downloads.pop(
+                            original_msg_id, None
+                        )  # Ensure removal on success, error, or cancel
+                    # Clean up progress state if status_msg exists (redundant but safe)
+                    if status_msg and chat_id:  # Check chat_id exists
+                        cleanup_progress_state(chat_id, status_msg.id)
 
         except Exception as e:
-            print(
-                f"Error in callback handler for user {user_id}, data '{data}': {type(e).__name__} - {e}"
+            print(f"Error processing callback data: {e}")
+            await callbackQuery.answer(
+                "⚠️ An error occurred while processing your request.", show_alert=True
             )
-            error_message = f"⚠️ {user.mention}, an error occurred processing your request.\n\n`{type(e).__name__}: {e}`"
-            if status_msg:
-                try:
-                    cleanup_progress_state(status_msg.chat.id, status_msg.id)
-                    # Edit status message without cancel button on error
-                    await edit_status_message(status_msg, error_message)
-                except Exception as edit_err:
-                    print(f"Failed to edit status message on error: {edit_err}")
-                    # Fallback to sending a new message if editing fails
-                    await client.send_message(
-                        chat_id,
-                        error_message,
-                        reply_to_message_id=(
-                            original_msg_id if original_msg_id else None
-                        ),
-                    )
-            else:
-                # Send error message if status_msg was never created
-                await client.send_message(
-                    chat_id,
-                    error_message,
-                    reply_to_message_id=original_msg_id if original_msg_id else None,
-                )
-            try:
-                # Acknowledge the callback query even on error
-                await callbackQuery.answer("⚠️ An error occurred.", show_alert=True)
-            except Exception:
-                pass  # Ignore if answering fails (e.g., query expired)
-
-        # --- Final Cleanup ---
-        finally:
-            # Add a small delay before attempting file deletion
-            await asyncio.sleep(2)  # Wait 2 seconds
-
-            # Remove downloaded file if it exists
-            if filepath and os.path.exists(filepath):
-                try:
-                    os.remove(filepath)
-                    print(f"Removed file: {filepath}")
-                except PermissionError as pe:
-                    print(
-                        f"PermissionError removing file {filepath}: {pe}. File might still be locked."
-                    )
-                except OSError as rm_err:
-                    print(f"Error removing file {filepath}: {rm_err}")
-
-            # Clean up caches and active download state associated with the original message ID
-            if original_msg_id:
-                url_cache.pop(original_msg_id, None)
-                active_downloads.pop(
-                    original_msg_id, None
-                )  # Ensure removal on success, error, or cancel
-            # Clean up progress state if status_msg exists (redundant but safe)
-            if status_msg and chat_id:  # Check chat_id exists
-                cleanup_progress_state(chat_id, status_msg.id)
 
     # --- Fallback for Unrecognized Callbacks ---
     else:
         await callbackQuery.answer(
             "Button action not recognized or expired.", show_alert=True
         )
+
+
+async def process_playlist_download(
+    client, message, user, height, playlist_data, callback_query
+):
+    """Process the download of selected videos from a playlist."""
+    chat_id = message.chat.id
+    user_id = user.id
+    selected_videos = sorted(playlist_data["selected_videos"])
+    total_videos = len(selected_videos)
+
+    # Create status message for playlist download
+    status_msg = await message.edit_text(
+        f"⏳ Processing {total_videos} video{'s' if total_videos > 1 else ''} from playlist..."
+    )
+
+    # Setup cancellation
+    cancel_event = asyncio.Event()
+    active_downloads[message.id] = cancel_event
+
+    cancel_button_markup = InlineKeyboardMarkup(
+        [[InlineKeyboardButton("❌ Cancel", callback_data=f"cancel:{message.id}")]]
+    )
+
+    try:
+        successful_downloads = 0
+        failed_downloads = 0
+
+        for index, video_idx in enumerate(selected_videos, 1):
+            if cancel_event.is_set():
+                await status_msg.edit_text("❌ Playlist download cancelled.")
+                return
+
+            video = playlist_data["info"]["entries"][video_idx]
+            video_url = video["url"]
+
+            await status_msg.edit_text(
+                f"⬇️ Downloading video {index}/{total_videos}\n"
+                f"🎬 **{video['title']}**",
+                reply_markup=cancel_button_markup,
+            )
+
+            try:
+                filepath, title, extension = await download_video_async(
+                    user_id,
+                    height,
+                    video_url,
+                    status_msg,
+                    user.mention,
+                    message.id,
+                    cancel_button_markup,
+                )
+
+                if filepath:
+                    # Upload the video
+                    thumbnail = THUMBNAIL_PATH[-1] if THUMBNAIL_PATH else None
+
+                    await client.send_video(
+                        chat_id=chat_id,
+                        video=filepath,
+                        thumb=thumbnail,
+                        caption=f"✅ **{index}/{total_videos}** - {title}\nFrom playlist: {playlist_data['info']['title']}\n\n"
+                        f"Via @{client.me.username}",
+                        file_name=f"{title}.{extension}",
+                        supports_streaming=True,
+                    )
+
+                    successful_downloads += 1
+
+                    # Clean up the file
+                    try:
+                        os.remove(filepath)
+                    except Exception as e:
+                        print(f"Error removing file {filepath}: {e}")
+                else:
+                    failed_downloads += 1
+
+            except Exception as e:
+                print(f"Error processing video {video['title']}: {e}")
+                failed_downloads += 1
+                continue
+
+        # Final status update
+        if successful_downloads > 0:
+            completion_text = (
+                f"✅ Playlist download complete!\n\n"
+                f"Successfully downloaded: {successful_downloads}/{total_videos}\n"
+            )
+            if failed_downloads > 0:
+                completion_text += f"Failed downloads: {failed_downloads}"
+
+            await status_msg.edit_text(completion_text)
+        else:
+            await status_msg.edit_text(
+                "❌ Failed to download any videos from the playlist."
+            )
+
+    except Exception as e:
+        await status_msg.edit_text(f"❌ Error processing playlist: {str(e)}")
+    finally:
+        # Clean up
+        active_downloads.pop(message.id, None)
+        playlist_cache.pop(message.id, None)

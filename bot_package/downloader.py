@@ -45,6 +45,55 @@ async def get_video_info(url: str):
         return None, None, None  # General error
 
 
+async def get_playlist_info(url: str):
+    """Fetches playlist information without downloading."""
+    opts = {
+        "cookiefile": "cookies.txt",
+        "skip_download": True,
+        "quiet": True,
+        "no_warnings": True,
+        "extract_flat": True,  # Don't extract video info for each video
+        "ignoreerrors": True,  # Skip unavailable videos
+    }
+    try:
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            info_dict = await asyncio.to_thread(ydl.extract_info, url, download=False)
+            if info_dict.get("_type") != "playlist":
+                return None  # Not a playlist
+
+            # Extract playlist info
+            playlist_info = {
+                "title": info_dict.get("title", "Unknown Playlist"),
+                "uploader": info_dict.get("uploader", "Unknown"),
+                "video_count": info_dict.get("playlist_count", 0),
+                "entries": [],
+            }
+
+            # Get duration if available
+            total_duration = 0
+            for entry in info_dict.get("entries", []):
+                if entry:
+                    duration = entry.get("duration", 0)
+                    total_duration += duration
+                    playlist_info["entries"].append(
+                        {
+                            "title": entry.get("title", "Unknown Video"),
+                            "duration": duration,
+                            "id": entry.get("id"),
+                            "url": entry.get("url")
+                            or f"https://youtu.be/{entry.get('id')}",
+                            "thumbnail": entry.get("thumbnail"),
+                        }
+                    )
+
+            playlist_info["total_duration"] = total_duration
+            return playlist_info
+
+    except Exception as e:
+        print(f"Error fetching playlist info: {e}")
+        return None
+
+
 def _run_yt_dlp_download(
     opts,
     url,
