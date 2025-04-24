@@ -4,6 +4,7 @@ import asyncio
 import time
 import shutil
 import re
+from functools import wraps
 from pymongo import MongoClient
 from pyrogram import Client, filters
 import pyrogram
@@ -12,20 +13,28 @@ from pyrogram.errors import FloodWait, PeerIdInvalid
 
 from .bot_instance import bot
 from .config import (
+    COMMAND_PREFIXES,
     LOG_CHANNEL,
     LINK_LOGS,
     AUTH_USERS,
+    RATE_LIMIT_DOWNLOAD_DURATION,
+    RATE_LIMIT_DOWNLOADS,
     THUMBNAIL_PATH,
     url_cache,
     last_update_time,
     UPDATE_INTERVAL,
     active_downloads,
+    rate_limit_cache,
+    RATE_LIMIT_MESSAGES,
+    RATE_LIMIT_DURATION,
+    download_limit_cache
 )
 from .helpers import (
     convert_thumbnail_to_jpeg,
     count_bot_users,
     count_sudo_users,
     download_thumbnail,
+    get_commands,
     get_resolution_buttons,
     create_progress_bar,
     edit_status_message,
@@ -38,6 +47,12 @@ from .helpers import (
     remove_a_sudo_user_from_the_db,
     list_all_sudo_users,
     list_all_users,
+    ban_user_in_mongodb,
+    set_commands,
+    unban_user_in_mongodb,
+    broadcast_message,
+    check_rate_limit,
+    is_user_banned,
 )
 from .downloader import get_video_info, download_video_async
 from replies import *  # Assuming replies.py exists and contains text variables
@@ -46,6 +61,43 @@ from buttons import (
     ABOUT_BUTTON,
     DL_COMPLETE_BUTTON,
 )  # Assuming buttons.py exists
+
+
+# --- Rate Limit Decorator ---
+def check_user_rate_limit(func):
+    """Decorator to check rate limit for regular messages"""
+
+    @wraps(func)
+    async def wrapper(client: Client, message, *args, **kwargs):
+        user_id = str(message.from_user.id)
+
+        # Skip rate limiting for sudo users and AUTH_USERS
+        if user_id in AUTH_USERS or find_sudo_user_by_id(user_id) == "True":
+            return await func(client, message, *args, **kwargs)
+
+        # Check if user is banned
+        if is_user_banned(user_id):
+            await message.reply("⛔ You are banned from using this bot.")
+            return
+
+        # Check rate limit
+        if check_rate_limit(
+            user_id, rate_limit_cache, RATE_LIMIT_MESSAGES, RATE_LIMIT_DURATION
+        ):
+            remaining_time = max(
+                [
+                    t + RATE_LIMIT_DURATION - time.time()
+                    for t in rate_limit_cache[user_id]
+                ]
+            )
+            await message.reply(
+                f"⚠️ Rate limit exceeded. Please try again in {int(remaining_time)} seconds."
+            )
+            return
+
+        return await func(client, message, *args, **kwargs)
+
+    return wrapper
 
 
 # --- MongoDB tools ---
@@ -106,7 +158,7 @@ async def mongo_check_sudo_database(
 # --- Command Handlers ---
 
 
-@bot.on_message(filters.command("start"))
+@bot.on_message(filters.command("start", COMMAND_PREFIXES))
 async def start_command(client: Client, message):
     user_id = str(message.from_user.id)
     userdict: dict = message.from_user
@@ -119,9 +171,8 @@ async def start_command(client: Client, message):
     )
 
 
-@bot.on_message(filters.command("help"))
+@bot.on_message(filters.command("help", COMMAND_PREFIXES))
 async def help_command(client: Client, message):
-
     user_id = str(message.from_user.id)
     userdict: dict = message.from_user
     await mongo_check_user_database(str(user_id), userdict, message)
@@ -129,20 +180,27 @@ async def help_command(client: Client, message):
     await message.reply(help_text)
 
 
-@bot.on_message(filters.command("about"))
+@bot.on_message(filters.command("about", COMMAND_PREFIXES))
 async def about_command(client: Client, message):
     user_id = str(message.from_user.id)
     userdict: dict = message.from_user
     await mongo_check_user_database(str(user_id), userdict, message)
 
+    text="""**__🤖 Bot Details:__**\n
+**Creator:** Shadow Orbs
+**Language:** Python 3
+**Library:** Pyrogram
+**Repo:** Click button below."""
+
+
     await message.reply(
-        text="**💁 Some details about Me 💁**",
+        text=text,
         reply_markup=InlineKeyboardMarkup(ABOUT_BUTTON),
         disable_web_page_preview=True,
     )
 
 
-@bot.on_message(filters.command("clean"))
+@bot.on_message(filters.command("clean", COMMAND_PREFIXES))
 async def clean_directory(client: Client, message):
     user_id = str(message.from_user.id)
     userdict: dict = message.from_user
@@ -207,7 +265,7 @@ async def _do_restart(client: Client):
         sys.exit(1)
 
 
-@bot.on_message(filters.command("restart"))
+@bot.on_message(filters.command("restart", COMMAND_PREFIXES))
 async def restart_command(client: Client, message):
     user_id = str(message.from_user.id)
     userdict: dict = message.from_user
@@ -260,6 +318,31 @@ async def youtube_url_handler(client: Client, message):
     user_id = str(message.from_user.id)
     userdict: dict = message.from_user
     await mongo_check_user_database(str(user_id), userdict, message)
+
+    # Skip rate limiting for sudo users and AUTH_USERS
+    if user_id not in AUTH_USERS and find_sudo_user_by_id(user_id) == "False":
+        # Check if user is banned
+        if is_user_banned(user_id):
+            await message.reply("⛔ You are banned from using this bot.")
+            return
+
+        # Check download rate limit
+        if check_rate_limit(
+            user_id,
+            download_limit_cache,
+            RATE_LIMIT_DOWNLOADS,
+            RATE_LIMIT_DOWNLOAD_DURATION,
+        ):
+            remaining_time = max(
+                [
+                    t + RATE_LIMIT_DOWNLOAD_DURATION - time.time()
+                    for t in download_limit_cache[user_id]
+                ]
+            )
+            await message.reply(
+                f"⚠️ Download rate limit exceeded. Please try again in {int(remaining_time)} seconds."
+            )
+            return
 
     url = message.text.strip()
     if not ("youtu" in url or "youtube" in url):
@@ -320,7 +403,7 @@ async def youtube_url_handler(client: Client, message):
 ##### Add a sudo user ########
 
 
-@bot.on_message(filters.command("addsudo"))
+@bot.on_message(filters.command("addsudo", COMMAND_PREFIXES))
 async def add_sudo_user(client: Client, message):
     user_id = str(message.from_user.id)
     check_db_for_sudo_user = find_sudo_user_by_id(user_id)
@@ -395,7 +478,8 @@ async def add_sudo_user(client: Client, message):
 
 ##### remove sudo user ########
 
-@bot.on_message(filters.command("rmsudo"))
+
+@bot.on_message(filters.command("rmsudo", COMMAND_PREFIXES))
 async def remove_sudo_user(client: Client, message):
     user_id = str(message.from_user.id)
     check_db_for_sudo_user = find_sudo_user_by_id(user_id)
@@ -443,7 +527,7 @@ async def remove_sudo_user(client: Client, message):
 # ---- List sudo users --------#
 
 
-@bot.on_message(filters.command("sudo"))
+@bot.on_message(filters.command("sudo", COMMAND_PREFIXES))
 async def list_sudo_users(client: Client, message):
     sudo_user_names = list_all_sudo_users()
     enumerated_sudo_user_names = []
@@ -479,7 +563,8 @@ async def list_sudo_users(client: Client, message):
 
 ### -------- List bot users -----
 
-@bot.on_message(filters.command("users"))
+
+@bot.on_message(filters.command("users", COMMAND_PREFIXES))
 async def list_users(client: Client, message):
     bot_user_names = list_all_users()
     bot_user_count = count_bot_users()
@@ -515,7 +600,7 @@ async def list_users(client: Client, message):
 
 
 # --- Command to show information about the lunux system
-@bot.on_message(filters.command("server"))
+@bot.on_message(filters.command("server", COMMAND_PREFIXES))
 async def server_info(client: Client, message):
     user_id = str(message.from_user.id)
     userdict: dict = message.from_user
@@ -531,6 +616,138 @@ async def server_info(client: Client, message):
         f"**Free:** {shutil.disk_usage('/').free / (1024. ** 3):.2f} GB free\n"
     )
     await message.reply(server_info_text)
+
+
+# --- Admin Commands ---
+
+@bot.on_message(filters.command("broadcast", COMMAND_PREFIXES))
+async def broadcast_cmd(client: Client, message):
+    """Broadcast a message to all users"""
+    user_id = str(message.from_user.id)
+    if user_id not in AUTH_USERS and find_sudo_user_by_id(user_id) == "False":
+        await message.reply("⛔ You are not authorized to broadcast messages.")
+        return
+
+    # Check if there's a message to broadcast
+    if not message.reply_to_message and len(message.command) < 2:
+        await message.reply(
+            "Please provide a message to broadcast or reply to a message."
+        )
+        return
+
+    # Get the message to broadcast
+    if message.reply_to_message:
+        broadcast_text = (
+            message.reply_to_message.text or message.reply_to_message.caption
+        )
+    else:
+        broadcast_text = " ".join(message.command[1:])
+
+    if not broadcast_text:
+        await message.reply("Cannot broadcast empty message.")
+        return
+
+    status_msg = await message.reply("Broadcasting message to all users...")
+    success_count, fail_count = await broadcast_message(client, broadcast_text)
+
+    await status_msg.edit(
+        f"📣 Broadcast completed!\n"
+        f"✅ Success: {success_count}\n"
+        f"❌ Failed: {fail_count}"
+    )
+
+
+@bot.on_message(filters.command(["ban", "unban"], COMMAND_PREFIXES))
+async def ban_unban_cmd(client: Client, message):
+    """Ban or unban a user"""
+    user_id = str(message.from_user.id)
+    if user_id not in AUTH_USERS and find_sudo_user_by_id(user_id) == "False":
+        await message.reply("⛔ You are not authorized to ban/unban users.")
+        return
+
+    command = message.command[0].lower()
+
+    # Get target user ID
+    target_user_id = None
+    if message.reply_to_message:
+        target_user_id = str(message.reply_to_message.from_user.id)
+    elif len(message.command) > 1:
+        target_user_id = message.command[1]
+
+    if not target_user_id:
+        await message.reply(
+            f"Please provide a user ID or reply to a user's message to {command}."
+        )
+        return
+
+    # Prevent banning sudo users or AUTH_USERS
+    if target_user_id in AUTH_USERS or find_sudo_user_by_id(target_user_id) == "True":
+        await message.reply("Cannot ban/unban admin users.")
+        return
+
+    if command == "ban":
+        if ban_user_in_mongodb(target_user_id):
+            await message.reply(f"🚫 User `{target_user_id}` has been banned.")
+        else:
+            await message.reply("Failed to ban user. They might not exist in database.")
+    else:  # unban
+        if unban_user_in_mongodb(target_user_id):
+            await message.reply(f"✅ User `{target_user_id}` has been unbanned.")
+        else:
+            await message.reply(
+                "Failed to unban user. They might not exist in database."
+            )
+
+
+@bot.on_message(filters.command("stats", COMMAND_PREFIXES))
+async def stats_cmd(client: Client, message):
+    """Show bot statistics"""
+    user_id = str(message.from_user.id)
+    if user_id not in AUTH_USERS and find_sudo_user_by_id(user_id) == "False":
+        await message.reply("⛔ You are not authorized to view statistics.")
+        return
+
+    total_users = count_bot_users()
+    sudo_users = count_sudo_users()
+    auth_users = len(AUTH_USERS)
+
+    # Get active downloads count
+    active_dl_count = len(active_downloads)
+
+    # Calculate storage usage
+    total_storage = shutil.disk_usage("/").total / (1024**3)
+    used_storage = shutil.disk_usage("/").used / (1024**3)
+    free_storage = shutil.disk_usage("/").free / (1024**3)
+
+    stats_text = (
+        "📊 **Bot Statistics**\n\n"
+        f"👥 Total Users: `{total_users}`\n"
+        f"👮 Admin Users: `{auth_users}`\n"
+        f"⭐️ Sudo Users: `{sudo_users}`\n"
+        f"⏳ Active Downloads: `{active_dl_count}`\n\n"
+        "💾 **Storage Info**\n"
+        f"Total: `{total_storage:.2f}` GB\n"
+        f"Used: `{used_storage:.2f}` GB\n"
+        f"Free: `{free_storage:.2f}` GB\n"
+    )
+
+    await message.reply(stats_text)
+
+
+# --- Set and get bot commands ---
+@bot.on_message(filters.command(["setcommands", "getcommands"], COMMAND_PREFIXES))
+async def set_commands_handler(bot: Client, message: pyrogram.types.Message):
+    user_id = str(message.from_user.id)
+    if user_id not in AUTH_USERS and find_sudo_user_by_id(user_id) == "False":
+        await message.reply("⛔ You are not authorized to use this command.")
+        return
+    
+    command = message.command[0].lower()
+
+    if command == "setcommands":
+        await set_commands(bot, message)
+    else:
+        await get_commands(bot, message)
 
 
 # --- Callback Query Handler ---
@@ -739,7 +956,7 @@ async def handle_callback_query(client: Client, callbackQuery: CallbackQuery):
                 reply_markup=InlineKeyboardMarkup(
                     DL_COMPLETE_BUTTON
                 ),  # Final message buttons
-                caption=f"✅ **Hey** {user.mention}\n{DL_COMPLETE_TEXT.format(url)}\n\nVia @{client.me.username}",
+                caption=f"✅ **Hey** {user.mention}\n{DL_COMPLETE_TEXT.format(url, title)}\n\nVia @{client.me.username}\n",
                 file_name=f"{title}.{extension}",
                 supports_streaming=True,
                 progress=upload_progress,

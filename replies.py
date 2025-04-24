@@ -10,9 +10,9 @@ about_text = f"""--**Bot Info:**--
 # some lines to display at the bottom
 liness = f"----------------------------------------"
 
-start_text = "✨ Hey {}\nWelcome to the youtube video downloader bot.\nSend /help to know how to use me."
+start_text = "✨ Hey {}\nWelcome to the world of Sky Monsters.\nSend /help to know what I can do."
 
-help_text = f"**Send me a youtube video link 🔗 and I will download it for you.**"
+help_text = f"__I'm a youtube video downloader.\nSend me a youtube video link 🔗 and I will download it for you.__"
 
 dl_text = "**Status:** **__Downloading ⬇️__**"
 
@@ -26,7 +26,7 @@ link_log_err = "There was an error in the link logs section."
 
 # video_caption = "Video "
 
-DL_COMPLETE_TEXT = "**__Your [Video]({}) has been uploaded successfully ✅__**"
+DL_COMPLETE_TEXT = "**__Your [Video]({}) has been uploaded successfully ✅__**\n**Vidoe title:** `{}`"
 
 VIDEO_FORMATS = [
     ".mp4",

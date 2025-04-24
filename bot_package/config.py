@@ -8,6 +8,12 @@ load_dotenv()
 PROGRESS_BAR_LENGTH = 12  # Length of the progress bar
 UPDATE_INTERVAL = 5  # Seconds between progress updates
 
+# --- Rate Limiting ---
+RATE_LIMIT_MESSAGES = 5  # Maximum messages per minute for non-sudo users
+RATE_LIMIT_DOWNLOADS = 2  # Maximum downloads per 5 minutes for non-sudo users
+RATE_LIMIT_DURATION = 60  # Duration in seconds for message rate limiting
+RATE_LIMIT_DOWNLOAD_DURATION = 300  # Duration in seconds for download rate limiting
+
 # --- Environment Variables ---
 API_ID = os.getenv("api_id")
 API_HASH = os.getenv("api_hash")
@@ -51,3 +57,11 @@ last_update_time = (
 active_downloads = (
     {}
 )  # Stores cancel flags for downloads {original_msg_id: asyncio.Event}
+rate_limit_cache = (
+    {}
+)  # Stores message timestamps for rate limiting {user_id: [timestamps]}
+download_limit_cache = {}  # Stores download timestamps {user_id: [timestamps]}
+
+
+# --- Misc ---
+COMMAND_PREFIXES = ["/", "!", ".", ","]
