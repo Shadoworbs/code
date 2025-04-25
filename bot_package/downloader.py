@@ -1,4 +1,6 @@
 import os
+import pprint
+import sys
 import yt_dlp
 import asyncio
 import time
@@ -112,7 +114,7 @@ def _run_yt_dlp_download(
     user_download_dir = get_user_download_path(user_id)
     cancel_event = active_downloads.get(original_msg_id)
 
-    def download_progress_hook(d):
+    def download_progress_hook(d: dict):
         # Check for cancellation signal
         if cancel_event and cancel_event.is_set():
             # Use a specific exception type if yt-dlp allows interrupting downloads
@@ -128,7 +130,21 @@ def _run_yt_dlp_download(
                 current_time - last_update_time.get((chat_id, message_id), 0)
                 > UPDATE_INTERVAL
             ):
-                percentage_str = d.get("_percent_str", "0%").strip("%")
+                # print("I got what I needed, quitting...")
+                # with open("progresshook.log", "a", encoding="utf-8") as f:
+                #     for key, value in d.items():
+                #         f.write(f'{key}: {value}\n')
+                # print("I got what i needed, quitting...")
+                # # pprint.pprint(d.items())
+                # sys.exit(1)
+                total_bytes = d.get("total_bytes_estimate", 1)
+                downloaded_bytes = d.get("downloaded_bytes", 1)
+                total_mb = total_bytes / (1024 * 1024) if total_bytes else 0
+                downloaded_mb = (
+                    downloaded_bytes / (1024 * 1024) if downloaded_bytes else 0
+                )
+                percentage_str = d.get("_percent", 0.0)
+
                 try:
                     percentage_float = float(percentage_str)
                 except ValueError:
@@ -136,19 +152,14 @@ def _run_yt_dlp_download(
 
                 speed = d.get("_speed_str", "N/A")
                 eta = d.get("_eta_str", "N/A")
-                total_bytes = d.get("total_bytes") or d.get("total_bytes_estimate", 0)
-                downloaded_bytes = d.get("downloaded_bytes", 0)
 
                 progress_bar = create_progress_bar(percentage_float)
                 total_mb = total_bytes / (1024 * 1024) if total_bytes else 0
-                downloaded_mb = (
-                    downloaded_bytes / (1024 * 1024) if downloaded_bytes else 0
-                )
 
                 progress_text = (
                     f"{dl_text}\n"
                     f"**By:** {user_mention}\n**User ID:** `{user_id}`\n\n"
-                    f"**Progress:** {progress_bar} {percentage_float:.1f}%\n"
+                    f"**Progress:** {progress_bar} {percentage_float:.2f}%\n"
                     f"File Size: `{total_mb:.2f} MB`\n"
                 )
 

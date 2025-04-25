@@ -408,7 +408,7 @@ async def youtube_url_handler(client: Client, message):
             video_id,
             user_id,
         )
-        convert_thumbnail_to_jpeg(args)  # Convert thumbnail to JPEG
+        # convert_thumbnail_to_jpeg(args)  # Convert thumbnail to JPEG
         VIDEO_ID.append(video_id)  # Store the video ID for later use
         print("Thumbnail conversion complete.")
 

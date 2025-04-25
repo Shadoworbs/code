@@ -37,7 +37,7 @@ def create_progress_bar(percentage: float, length: int = PROGRESS_BAR_LENGTH) ->
     if not 0 <= percentage <= 100:
         percentage = max(0, min(100, percentage))  # Clamp percentage
     filled_length = int(length * percentage // 100)
-    bar = "█" * filled_length + "░" * (length - filled_length)
+    bar = "•" * filled_length + "°" * (length - filled_length)
     return f"[{bar}]"
 
 
