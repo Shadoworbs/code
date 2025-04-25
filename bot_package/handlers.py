@@ -402,15 +402,15 @@ async def youtube_url_handler(client: Client, message):
 
         url_cache[message.id] = url
 
-        print("Checking thumbnail status...")
-        args: tuple = (
-            thumbnail_url,
-            video_id,
-            user_id,
-        )
+        # print("Checking thumbnail status...")
+        # args: tuple = (
+        #     thumbnail_url,
+        #     video_id,
+        #     user_id,
+        # )
         # convert_thumbnail_to_jpeg(args)  # Convert thumbnail to JPEG
-        VIDEO_ID.append(video_id)  # Store the video ID for later use
-        print("Thumbnail conversion complete.")
+        # VIDEO_ID.append(video_id)  # Store the video ID for later use
+        # print("Thumbnail conversion complete.")
 
         keyboard = get_resolution_buttons(message.id)
         caption = f"🎬 **{title}**\n\n{VIDEO_HEIGHT_TEXT}"
@@ -1144,7 +1144,7 @@ async def handle_callback_query(client: Client, callbackQuery: CallbackQuery):
                             f"{upl_text}\n"
                             f"**By:** {user.mention}\n**User ID:** `{user_id}`\n\n"
                             f"**Progress:** {progress_bar} {percentage:.1f}%\n"
-                            f"`{current_mb:.2f} MB / {total_mb:.2f} MB`"
+                            f"File Size: `{total_mb:.2f} MB`"
                         )
                         loop = asyncio.get_running_loop()
                         # Edit message with progress AND the cancel button
@@ -1165,13 +1165,13 @@ async def handle_callback_query(client: Client, callbackQuery: CallbackQuery):
                     )
                     await asyncio.sleep(1)  # Brief pause before upload
 
-                    thumbnail = THUMBNAIL_PATH[-1] or None
+                    # thumbnail = THUMBNAIL_PATH[-1] or None
 
                     print("Uploading...")
                     send = await client.send_video(
                         chat_id=chat_id,
                         video=filepath,
-                        thumb=thumbnail,  # Use thumbnail if available
+                        # thumb=thumbnail,  # Use thumbnail if available
                         reply_markup=InlineKeyboardMarkup(
                             DL_COMPLETE_BUTTON
                         ),  # Final message buttons
