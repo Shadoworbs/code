@@ -149,7 +149,7 @@ def _run_yt_dlp_download(
                     f"{dl_text}\n"
                     f"**By:** {user_mention}\n**User ID:** `{user_id}`\n\n"
                     f"**Progress:** {progress_bar} {percentage_float:.1f}%\n"
-                    f"`{downloaded_mb:.2f} MB / {total_mb:.2f} MB`\n"
+                    f"File Size: `{total_mb:.2f} MB`\n"
                 )
 
                 # Schedule the edit_status_message coroutine on the main event loop
