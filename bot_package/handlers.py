@@ -1143,8 +1143,8 @@ async def handle_callback_query(client: Client, callbackQuery: CallbackQuery):
                         progress_text = (
                             f"{upl_text}\n"
                             f"**By:** {user.mention}\n**User ID:** `{user_id}`\n\n"
-                            f"**Progress:** {progress_bar} {percentage:.1f}%\n"
-                            f"File Size: `{total_mb:.2f} MB`"
+                            f"**Progress:** {progress_bar}\n"
+                            f"**Uploaded:** `{percentage:.1f}%` of `{total_mb:.2f} Mb`\n"
                         )
                         loop = asyncio.get_running_loop()
                         # Edit message with progress AND the cancel button

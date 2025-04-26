@@ -159,8 +159,8 @@ def _run_yt_dlp_download(
                 progress_text = (
                     f"{dl_text}\n"
                     f"**By:** {user_mention}\n**User ID:** `{user_id}`\n\n"
-                    f"**Progress:** {progress_bar} {percentage_float:.2f}%\n"
-                    f"File Size: `{total_mb:.2f} MB`\n"
+                    f"**Progress:** {progress_bar}\n"
+                    f"**Downloaded:** `{percentage_float:.1f}%` of `{total_mb:.2f} Mb`\n"
                 )
 
                 # Schedule the edit_status_message coroutine on the main event loop
@@ -210,8 +210,7 @@ def _run_yt_dlp_download(
                         if info_dict.get("id") in file and file.endswith(".mp4"):
                             filepath = os.path.join(user_download_dir, file)
                             print(
-                                f"Found matching mp4 file via fallback search: {filepath}"
-                            )
+                                f"Found matching mp4 file via fallback search: {filepath}")
                             found_fallback = True
                             break
                     if not found_fallback:
