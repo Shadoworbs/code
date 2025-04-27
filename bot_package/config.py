@@ -5,8 +5,8 @@ import ast  # Import ast for literal evaluation
 load_dotenv()
 
 # --- Constants ---
-PROGRESS_BAR_LENGTH = 12  # Length of the progress bar
-UPDATE_INTERVAL = 5  # Seconds between progress updates
+PROGRESS_BAR_LENGTH = 10  # Length of the progress bar
+UPDATE_INTERVAL = 10  # Seconds between progress updates
 
 # --- Rate Limiting ---
 RATE_LIMIT_MESSAGES = 5  # Maximum messages per minute for non-sudo users
