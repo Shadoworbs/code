@@ -33,3 +33,4 @@
 
 # ignore cookies file
 /cookies.txt
+*.log
